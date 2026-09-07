@@ -1,0 +1,25 @@
+{
+  "name": "@masax/catalogue",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ASA domain: catalogues, groups, plates, parts, VIN decoding, supersession",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@masax/core": "workspace:*",
+    "@masax/lex": "workspace:*"
+  }
+}

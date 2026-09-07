@@ -1,0 +1,27 @@
+{
+  "name": "@masax/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ASA disc tooling: validate the formats, inspect datasets, decode VINs and drawings",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "type": "module",
+  "bin": {
+    "masax": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@commander-js/extra-typings": "^15.0.0",
+    "@masax/catalogue": "workspace:*",
+    "@masax/core": "workspace:*",
+    "@masax/lex": "workspace:*",
+    "chalk": "^6.0.0",
+    "commander": "^15.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1"
+  }
+}

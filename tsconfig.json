@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/lex" },
+    { "path": "./packages/illust" },
+    { "path": "./packages/catalogue" },
+    { "path": "./apps/cli" }
+  ]
+}

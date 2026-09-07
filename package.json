@@ -1,0 +1,31 @@
+{
+  "name": "masax",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Browser-based Mitsubishi parts catalogue — a client-side reimplementation of the After Sales Application (ASA)",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/emdzej/masax"
+  },
+  "type": "module",
+  "packageManager": "pnpm@10.33.4",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "pnpm --filter @masax/web dev",
+    "cli": "node apps/cli/dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "turbo run typecheck && pnpm --filter @masax/web typecheck",
+    "check": "turbo run build typecheck && pnpm --filter @masax/web typecheck && pnpm test",
+    "format": "prettier --write .",
+    "clean": "turbo run clean"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "prettier": "^3.5.1",
+    "turbo": "^2.8.10",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

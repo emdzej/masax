@@ -1,11 +1,18 @@
-__pycache__/
-*.pyc
-
 # Vendor binaries, staged locally for a decompiler. Not ours to redistribute;
 # stage them yourself from PROG/ with re/tools/stage.sh.
 re/bin/
 
-# Extracted media and installation trees.
+# Extracted media and installation trees. Not ours, not committed, very large.
+data/
 out/
 media/
 discs/
+
+node_modules/
+dist/
+build/
+.turbo/
+*.log
+*.tsbuildinfo
+__pycache__/
+*.pyc
