@@ -2,11 +2,11 @@
 
 ## What the source archives actually are
 
-| Archive | Contents | Verdict |
-|---|---|---|
-| `ASA_EUROPE.zip` (371 MB) | `MMC_ASA_EUR_A.iso` (440 MB), `MMC_ASA_EUR_B.iso` (350 MB) | **the original media** — use this |
-| `MMC_ASA_M60_803.exe` (372 MB) | self-extracting **RAR5**; payload is an already-installed `M60/` tree | a repack, not media |
-| `rev/ASA.zip` (367 MB) | a dump of `C:\MMC\ASA` after installation | useful as a reference target |
+| Archive                        | Contents                                                              | Verdict                           |
+| ------------------------------ | --------------------------------------------------------------------- | --------------------------------- |
+| `ASA_EUROPE.zip` (371 MB)      | `MMC_ASA_EUR_A.iso` (440 MB), `MMC_ASA_EUR_B.iso` (350 MB)            | **the original media** — use this |
+| `MMC_ASA_M60_803.exe` (372 MB) | self-extracting **RAR5**; payload is an already-installed `M60/` tree | a repack, not media               |
+| `rev/ASA.zip` (367 MB)         | a dump of `C:\MMC\ASA` after installation                             | useful as a reference target      |
 
 `MMC_ASA_M60_803.exe` is a PE whose last 99.9% is a RAR5 archive carrying a
 Cyrillic comment. It holds an installed tree with delta updates already folded
@@ -77,7 +77,7 @@ self-extractors, and `re/tools/unwise.py` recovers their payloads. Each carries
 a plain-text recipe for `DeltaUpd.exe` plus `.U<nn>` record deltas, both
 documented in [`data-format.md`](data-format.md#delta-updates). The recipe's checksum is
 reflected CRC32 with a zero init and no final complement, and it describes the
-target *after* patching — see
+target _after_ patching — see
 [`data-format.md`](data-format.md#the-checksum).
 
 **The shipped delta chain is not applicable to these discs.** None of the 769
@@ -90,12 +90,12 @@ from an installation that reached it, not by patching this media.
 
 Record counts, media versus the updated dump:
 
-| | media (`DATA1`) | updated (`DATA2`) |
-|---|---|---|
-| catalogues | 52 | 55 |
-| `catalog` rows | 194,801 | 206,416 |
-| `PBook` rows | 237,164 | 242,288 |
-| `Desc` strings (×4 languages) | 48,549 | 49,708 |
+|                               | media (`DATA1`) | updated (`DATA2`) |
+| ----------------------------- | --------------- | ----------------- |
+| catalogues                    | 52              | 55                |
+| `catalog` rows                | 194,801         | 206,416           |
+| `PBook` rows                  | 237,164         | 242,288           |
+| `Desc` strings (×4 languages) | 48,549          | 49,708            |
 
 ## Extracting without a Windows install
 

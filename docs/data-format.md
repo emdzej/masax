@@ -4,12 +4,17 @@ Mitsubishi's After Sales Application (ASA) is an electronic parts catalogue
 built by **LexCom Informationssysteme** (Munich). The data engine is theirs, not
 Mitsubishi's — `LexDdm.dll`, `fdtpdll.dll`, volume labels like `LexASAM60`. The
 same engine shows up in other OEM catalogues, so this document describes the
-*LexCom* format, with Mitsubishi's schema as the worked example.
+_LexCom_ format, with Mitsubishi's schema as the worked example.
 
-Everything below is validated by `re/tools/verify.py`, which decodes every
-record of every dataset and asserts each one consumes exactly its declared
-payload length. Current status: **1,889,570 / 1,889,570 records on the original
-media, 3,854,258 / 3,854,258 on a fully updated installation — 100%.**
+Everything below is validated by `masax verify`, which walks every dataset in
+storage order and asserts each record consumes exactly its declared payload
+length, that the walk ends precisely at the end of the file, that every index
+offset lands on a record boundary, and that the declared run keys match the
+data. Current status: **9,495,097 records on the original media, all clean.**
+
+> An earlier version of this document quoted 1,889,570 records. That was the
+> number of `.pnt` **index entries**, and the index covers only about a fifth of
+> the data — see the `.pnt` section below.
 
 ## Layout of an installation
 
@@ -32,12 +37,12 @@ complete, independently readable dataset.
 
 Every table is a quadruple sharing one base name:
 
-| File | Role |
-|---|---|
-| `.ddm` | INI text: the field list, with human-readable comments |
+| File   | Role                                                     |
+| ------ | -------------------------------------------------------- |
+| `.ddm` | INI text: the field list, with human-readable comments   |
 | `.fdt` | binary field definition table: schema plus record layout |
-| `.bin` | the records |
-| `.pnt` | the index — sorted key → byte offset |
+| `.bin` | the records                                              |
+| `.pnt` | the index — sorted key → byte offset                     |
 
 The `.bin` and `.pnt` names come from the `.fdt`, not from the `.ddm` name, and
 they may contain `@` — a placeholder for a **language code** (`D F GB I J NL P E
@@ -70,24 +75,24 @@ the `.ddm` comments disagree, the `.ddm` is the better name.
 
 All little-endian.
 
-| Offset | Type | Meaning |
-|---|---|---|
-| `0x00` | u16 | magic, always `0x36` |
-| `0x02` | u16 | **top-level** field count |
-| `0x04` | u16 | **total** field count, including group children |
-| `0x06` | u16 | label count |
-| `0x08` | char[13] | `.bin` filename template, NUL-terminated |
-| `0x15` | char[13] | `.pnt` filename template |
-| `0x22` | u16 | max unpacked record length |
-| `0x26` | u16 | **record encoding: `9` = sparse, anything else = dense** |
-| `0x2a` | u16 | key field count |
-| `0x2c` | char[3]× | key field codes, then zero padding |
-| `0x38` | | field descriptors, 13 bytes each |
-| then | | record layout table |
-| then | | field labels: u16 length (incl NUL) + bytes |
+| Offset | Type     | Meaning                                                  |
+| ------ | -------- | -------------------------------------------------------- |
+| `0x00` | u16      | magic, always `0x36`                                     |
+| `0x02` | u16      | **top-level** field count                                |
+| `0x04` | u16      | **total** field count, including group children          |
+| `0x06` | u16      | label count                                              |
+| `0x08` | char[13] | `.bin` filename template, NUL-terminated                 |
+| `0x15` | char[13] | `.pnt` filename template                                 |
+| `0x22` | u16      | max unpacked record length                               |
+| `0x26` | u16      | **record encoding: `9` = sparse, anything else = dense** |
+| `0x2a` | u16      | key field count                                          |
+| `0x2c` | char[3]× | key field codes, then zero padding                       |
+| `0x38` |          | field descriptors, 13 bytes each                         |
+| then   |          | record layout table                                      |
+| then   |          | field labels: u16 length (incl NUL) + bytes              |
 
-The 13-byte padding of the two filename templates is *stale, uninitialised
-bytes*, not zeros — `catalog.fdt` holds `"@.bin\0" + "g.bin\0"`, left over from
+The 13-byte padding of the two filename templates is _stale, uninitialised
+bytes_, not zeros — `catalog.fdt` holds `"@.bin\0" + "g.bin\0"`, left over from
 a longer previous name. Always cut at the first NUL.
 
 A **field descriptor** is:
@@ -103,22 +108,22 @@ uint16 type;        // storage type, see below
 
 Storage types:
 
-| `type` | Meaning |
-|---|---|
-| `0x12` | fixed-width text, space padded to `width` |
-| `0x14` | unsigned integer, `width` bytes, little-endian |
-| `0x16` | signed integer, `width` bytes, little-endian |
-| `0x22` | variable text: one length byte, then that many bytes |
-| `0x0a`, `0x1a` | repeating **group** header |
+| `type`         | Meaning                                              |
+| -------------- | ---------------------------------------------------- |
+| `0x12`         | fixed-width text, space padded to `width`            |
+| `0x14`         | unsigned integer, `width` bytes, little-endian       |
+| `0x16`         | signed integer, `width` bytes, little-endian         |
+| `0x22`         | variable text: one length byte, then that many bytes |
+| `0x0a`, `0x1a` | repeating **group** header                           |
 
 Storage classes:
 
-| `storage` | Meaning |
-|---|---|
-| `1` | group header |
-| `2` | array, **u8** element count |
-| `3` | plain scalar |
-| `4` | array, **u16** element count |
+| `storage` | Meaning                      |
+| --------- | ---------------------------- |
+| `1`       | group header                 |
+| `2`       | array, **u8** element count  |
+| `3`       | plain scalar                 |
+| `4`       | array, **u16** element count |
 
 **`max_repeat` alone does not mean the field repeats.** `DudMMC.A0` has
 `max_repeat=4` and is a plain 4-byte integer. Only `storage` decides. Getting
@@ -137,7 +142,7 @@ bit in the presence bitmap.
 
 The **record layout table** is a u16 byte size (always `8 × total_fields`) then
 one entry per field: `u16 offset, u16 width, u16 type, u16 index`. The offsets
-describe the *unpacked* buffer the engine reads a record into, not the file. You
+describe the _unpacked_ buffer the engine reads a record into, not the file. You
 do not need it to read `.bin`; its size is a good self check.
 
 ### `.pnt` — the index
@@ -150,8 +155,25 @@ key bytes (sum of the key fields' widths) || uint32 offset into .bin
 
 So 8 bytes for a 4-byte integer key, 11 for a 7-character PNC, 21 for a
 17-character part number. A **variable-text key is space padded to its full
-width here**, even though `.bin` stores it length-prefixed. Record count is
-simply `filesize / entry_size`.
+width here**, even though `.bin` stores it length-prefixed.
+
+**The index does not cover every record.** `filesize / entry_size` is the number
+of _index entries_, not records, and for the navigation and parts tables the two
+are wildly different:
+
+| dataset                       | index entries  | records        |
+| ----------------------------- | -------------- | -------------- |
+| `pnc`, `PBook`, `Desc`, `rep` | one per record | one per record |
+| `MGroup`                      | 259            | 6,607          |
+| `SGroup`                      | 259            | 34,555         |
+| `BGroup`                      | 6,355          | 61,111         |
+| `catalog` (all 52)            | 194,801        | 3,027,265      |
+| `A/Vin`                       | 408,872        | 2,669,815      |
+
+Every index offset lands on a record boundary, and a sequential walk of the
+`.bin` ends exactly at the end of the file — both are checked by `masax verify`.
+So the index points _into_ the file rather than enumerating it, and the
+remaining records are reached by reading forward. See **Runs** below.
 
 ### `.bin` — the records
 
@@ -181,31 +203,88 @@ Datasets with `0x26 != 9` have no bitmap and store every field. They are all
 small — two to four fields — which makes it easy to "confirm" a dense reader
 against them and then be wrong about the eleven interesting tables.
 
+## Runs, and the fields a record inherits
+
+Records are stored in runs. The first record of a run carries the fields that
+identify it; later records **omit whatever has not changed** and inherit those
+fields from the record before them. Without that rule a continuation record is
+meaningless — a part with no part-name code and no model.
+
+For a catalogue the inherited fields are `A1` (PNC), `A2` (Model), `B1`
+(MainGroup) and `B2` (SubGroup). One run is one (model, main group, subgroup,
+PNC) and its records are the part numbers for it:
+
+```
+off      0  PNC=01000A  model=L042G  MG=11  SG=10  part=MD990099   <- run start
+off     66                                         part=MD990100
+off    109                                         part=MD990101
+off    152                                         part=MD991233
+```
+
+**Do not carry every absent field forward.** `E1` (OPC), `E2` (Classification)
+and `E3` (ApplicableCodes) are per-record applicability, and inheriting them
+makes a part look like it fits a vehicle it does not. On one plate — model
+`L042G`, main group 13, subgroup 010 — blanket inheritance reports all 42 parts
+as option-restricted; the truth is 1 with an OPC and 6 with a classification.
+Read with the right rule the plate makes sense as a catalogue:
+
+```
+PNC     part        from     to       OPC   classification
+05021   MB247230    1983011  1986043  -     -
+05021   MB247230    1986051  1991061  -     NJL6,VNJL6,VNJR6
+05021   MB504621    1986051  1991061  -     NJQL6,VNJQL6
+```
+
+Two part numbers for one PNC in the same date window, separated by
+classification — which is what applicability _is_.
+
+### Deriving the run key
+
+The property that identifies an inheritable field is **never present in a
+continuation record**. A field that appears only where a run begins can be
+carried forward; one that also appears mid-run is per-record data.
+
+"Present in every run start" looks like the same test and is not: a
+single-model catalogue omits `A2` even at its run starts, so that test drops
+`A2` for three of the 52 files and the derived key disagrees with itself between
+catalogues. On the never-continued test all 52 agree on
+`[A1, A2, B1, B2]`, while `E1` appears in 35% of continuation records.
+
+`masax verify --run-keys` prints what the data says; a plain `masax verify`
+re-derives it and fails if the declaration in `@masax/catalogue` has gone stale.
+
 ## Mitsubishi's schema
 
 Text is normalised: nearly every human-readable string is an integer **TS**
 (text serial) resolved through `Desc`, which exists once per language. This is
 what makes the catalogue multilingual without duplicating structure.
 
-| Dataset | Key | Rows* | What it is |
-|---|---|---|---|
-| `catalog` | PNC | 194,801 | **the parts table**, one file per catalogue |
-| `PBook` | part number | 237,164 | part master: maker, supersession, colour, material |
-| `Vin` | serial no | 881,746 | VIN → model, OPC, paint, trim, production date |
-| `Opc` | model+OPC | 41,030 | option/spec codes per model |
-| `Desc` | TS | 48,549 ×4 | **all display text**, one file per language |
-| `pnc` | PNC | 28,313 | part name code → TS |
-| `PREF` | part number | 249,378 | part → PNC → catalogue reverse index |
-| `MGroup` | catalogue | 259 | model → main group, index illustration |
-| `SGroup`/`BGroup` | catalogue | 6,614 | subgroups and plates, with illustrations |
-| `rep` | part number | 21,494 | supersession chains, previous and next |
-| `SSP` | part number | 237 | secondary service part numbers |
-| `SPN` | SPN | 931 ×4 | service parts news |
-| `CInfo` | catalogue | 52 | catalogue id → model name, data package |
-| `OInfo`, `VInfo`, `ASP`, `OpcMod`, `pnc_desc` | | | option, vehicle-name, publication lookups |
-| `DudMMC`, `MsgUpd` | TS | 716 ×9 | UI word index and update messages (in `PROG/`) |
+| Dataset            | Key                | Records*  | Indexed* | What it is                                         |
+| ------------------ | ------------------ | --------- | -------- | -------------------------------------------------- |
+| `catalog`          | PNC                | 3,027,265 | 194,801  | **the parts table**, one file per catalogue        |
+| `Vin` (A+B)        | serial no          | 5,418,637 | 881,746  | VIN → model, OPC, paint, trim, production date     |
+| `PBook`            | part number        | 237,164   | 237,164  | part master: maker, supersession, colour, material |
+| `PREF` (A+B)       | part number        | 286,239   | 249,378  | part → PNC → catalogue reverse index               |
+| `Desc`             | TS                 | 48,549 ×4 | all      | **all display text**, one file per language        |
+| `Opc`              | model+OPC          | 66,382    | 41,030   | option/spec codes per model                        |
+| `OpcMod`           | model+OPC          | 66,382    | 242      | a second index over the same `opc.bin`             |
+| `pnc`              | PNC                | 28,313    | 28,313   | part name code → TS                                |
+| `pnc_desc`         | PNC                | 28,313    | 16,132   | part name code descriptions                        |
+| `BGroup`           | catalogue+model+MG | 61,111    | 6,355    | plates, with the drawing reference                 |
+| `SGroup`           | catalogue+model    | 34,555    | 259      | subgroups                                          |
+| `MGroup`           | catalogue+model    | 6,607     | 259      | main groups, with the index illustration           |
+| `rep`              | part number        | 21,494    | 21,494   | supersession chains, previous and next             |
+| `OInfo`            | option             | 6,223     | 6,223    | option descriptions                                |
+| `SPN`              | SPN                | 931 ×4    | all      | service parts news                                 |
+| `VInfo`            | VNC                | 263       | 35       | vehicle name code → model and catalogue            |
+| `SSP`              | part number        | 241       | 237      | secondary service part numbers                     |
+| `CInfo`            | catalogue          | 52        | 52       | catalogue id → model name, data package            |
+| `ASP`              | model              | 7         | 1        | publications                                       |
+| `DudMMC`, `MsgUpd` | TS                 | 716 ×9    | all      | UI word index and update messages (`PROG/`)        |
 
-\* original media, `EPC/DATA1`.
+\* original media, `EPC/DATA1`. **9,495,097 records in total**, of which
+1,889,570 are reachable through an index. `OpcMod` shares `opc.bin` with `Opc`,
+so its records are counted twice in that total.
 
 `catalog`'s fields are `PNC, Model, MainGroup, SubGroup, StartDate, EndDate,
 PartNumber, Qty, SupplyCondition, OPC, DescTs, Classification[100],
@@ -239,7 +318,7 @@ python3 re/tools/deillust.py --check <tree>/M60/ILLUST
 
 The obfuscation sits on top of plain TIFF rather than being a container format:
 `LxidTiff.dll` genuinely tests for the `II*` magic, and `LxidDcod.dll` picks a
-codec by *file extension* (`FUN_6010e220` searches the name for `'.'`), so the
+codec by _file extension_ (`FUN_6010e220` searches the name for `'.'`), so the
 `.tif` extension is load-bearing even though the stored bytes are not TIFF.
 
 Note the trap: XOR-ing with `0x0b` alone yields `73 49 2a 00` -- "sI\*\0",
@@ -303,8 +382,8 @@ program directories and the new update level:
 ?9J3%4\ASAMAIN.INI   U   M60   UPDLEVEL_EPC   %L
 ```
 
-`#A` applies a delta: *target `.bin`*, *an 8-hex-digit checksum*, *the delta
-file*, *the schema `.fdt`*. `#1` copies a file set, `#6` copies a single file,
+`#A` applies a delta: _target `.bin`_, _an 8-hex-digit checksum_, _the delta
+file_, _the schema `.fdt`_. `#1` copies a file set, `#6` copies a single file,
 `#9H*` sets up logging, and a `?` prefix marks a step as optional. The last line
 is what bumps `UPDLEVEL_EPC` in `ASAMAIN.ini`.
 
@@ -325,7 +404,7 @@ def checksum(data):                       # re/tools/delta.py
 The published value is the expected checksum of the target **after** the update
 is applied, not before. Across all 34 update recipes this reproduces 77 exact
 target-name-and-value matches against an installation at level 89, and for every
-file the matching level is 089 — the last update. That it is the *post* state is
+file the matching level is 089 — the last update. That it is the _post_ state is
 settled independently: update 089's `PNC.U11` adds part-name codes `98127` and
 `98128`, and both are present in that tree and absent from the base data.
 
@@ -333,11 +412,11 @@ settled independently: update 089's `PNC.U11` adds part-name codes `98127` and
 
 A delta is a flat sequence of operations on one dataset's `.bin`:
 
-| Field | Type | Meaning |
-|---|---|---|
-| offset | u32 | byte offset in the target `.bin` |
-| opcode | u8 | `'A'` add, `'D'` delete, `'U'` update |
-| length | u16 | payload length |
+| Field   | Type  | Meaning                                     |
+| ------- | ----- | ------------------------------------------- |
+| offset  | u32   | byte offset in the target `.bin`            |
+| opcode  | u8    | `'A'` add, `'D'` delete, `'U'` update       |
+| length  | u16   | payload length                              |
 | payload | bytes | a record body, encoded exactly as in `.bin` |
 
 So deltas carry **whole records, not byte patches**, and the payload is read
@@ -364,7 +443,7 @@ file on the discs, under any CRC variant tried — while the same search finds 7
 matches against an update-derived tree. The discs are a freshly mastered
 snapshot dated 2008-09-19, not the result of running the chain, so their bytes
 differ from an updated tree even where the logical content agrees. The update
-packages on disc A exist to bring *older installations* forward; they are not a
+packages on disc A exist to bring _older installations_ forward; they are not a
 patch series for the media itself.
 
 ## Reading a vehicle

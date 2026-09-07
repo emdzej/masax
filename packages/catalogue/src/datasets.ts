@@ -20,6 +20,19 @@ export interface DatasetSpec {
   /** The `.ddm` basename, and the name used on the command line. */
   name: string;
   variant: VariantKind;
+  /**
+   * Fields a record inherits from the one before it when absent.
+   *
+   * The `.pnt` index points at the first record of a run, and later records in
+   * the run omit whatever has not changed. Undefined or empty means the index
+   * covers every record and nothing is inherited.
+   *
+   * These are derived from the data, not guessed — a run-key field is present
+   * in every record that starts a run and in none that continues one — and
+   * `masax verify` re-derives them and fails if a declaration has gone stale.
+   * `masax verify --run-keys` prints what the data says.
+   */
+  runKey?: readonly string[];
   /** What it holds, for `--schema` output and the interface. */
   role: string;
   /**
@@ -33,18 +46,46 @@ export interface DatasetSpec {
 /** Datasets directly under `EPC/DATA<n>`. */
 export const CATALOGUE_DATASETS: readonly DatasetSpec[] = [
   { name: "CInfo", variant: "none", role: "catalogue id to model name and data package" },
-  { name: "catalog", variant: "catalogue", role: "the parts table, one file per catalogue" },
-  { name: "MGroup", variant: "none", role: "model to main group, with the index illustration" },
-  { name: "SGroup", variant: "none", role: "subgroups" },
-  { name: "BGroup", variant: "none", role: "plates, with the drawing reference" },
+  {
+    name: "catalog",
+    variant: "catalogue",
+    role: "the parts table, one file per catalogue",
+    // Not the applicability fields: E1 (OPC) and E2 (Classification) are
+    // per-record, and inheriting them puts parts on vehicles they do not fit.
+    runKey: ["A1", "A2", "B1", "B2"],
+  },
+  {
+    name: "MGroup",
+    variant: "none",
+    role: "model to main group, with the index illustration",
+    runKey: ["A0", "A1", "A8"],
+  },
+  { name: "SGroup", variant: "none", role: "subgroups", runKey: ["A0", "A1", "A2"] },
+  {
+    name: "BGroup",
+    variant: "none",
+    role: "plates, with the drawing reference",
+    runKey: ["A0", "A1", "A2"],
+  },
   { name: "PBook", variant: "none", role: "part master: maker, supersession, colour, material" },
   { name: "pnc", variant: "none", role: "part name code to text serial" },
   { name: "pnc_desc", variant: "none", role: "part name code descriptions" },
   { name: "Desc", variant: "language", role: "all display text, one file per language" },
-  { name: "Opc", variant: "none", role: "option and spec codes per model" },
-  { name: "OpcMod", variant: "none", role: "option codes by model" },
+  { name: "Opc", variant: "none", role: "option and spec codes per model", runKey: ["A0", "A1"] },
+  {
+    name: "OpcMod",
+    variant: "none",
+    // A second index over the same `opc.bin`: there is no `opcmod.bin`.
+    role: "option codes by model, a second index over the Opc data",
+    runKey: ["A0", "A1"],
+  },
   { name: "OInfo", variant: "none", role: "option descriptions" },
-  { name: "VInfo", variant: "none", role: "vehicle name code to model and catalogue" },
+  {
+    name: "VInfo",
+    variant: "none",
+    role: "vehicle name code to model and catalogue",
+    runKey: ["A0", "A1", "A2", "A3", "A5"],
+  },
   { name: "rep", variant: "none", role: "supersession chains, previous and next" },
   { name: "SSP", variant: "none", role: "secondary service part numbers" },
   { name: "SPN", variant: "language", role: "service parts news" },
@@ -55,8 +96,18 @@ export const CATALOGUE_DATASETS: readonly DatasetSpec[] = [
 
 /** Datasets under `EPC/DATA<n>/A` and `.../B` — the two index halves. */
 export const HALF_DATASETS: readonly DatasetSpec[] = [
-  { name: "Vin", variant: "none", role: "serial to model, OPC, paint, trim, production date" },
-  { name: "PREF", variant: "none", role: "part number to part name code and catalogue" },
+  {
+    name: "Vin",
+    variant: "none",
+    role: "serial to model, OPC, paint, trim, production date",
+    runKey: ["A0"],
+  },
+  {
+    name: "PREF",
+    variant: "none",
+    role: "part number to part name code and catalogue",
+    runKey: ["A0"],
+  },
   { name: "Sec", variant: "none", role: "serial to catalogue number", optional: true },
 ];
 

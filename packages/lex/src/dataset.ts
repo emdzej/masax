@@ -10,7 +10,7 @@ import { parseDdm, type Ddm, type DdmField } from "./ddm.js";
 import { parseFdt, type Fdt, type Field } from "./fdt.js";
 import { PntIndex, type PntKey } from "./pnt.js";
 import { decodeRecord, type LexRecord } from "./record.js";
-import { BytesReader, type Reader, type Source } from "./reader.js";
+import type { Reader, Source } from "./reader.js";
 
 /** A field with the `.ddm` comment folded in — the name worth showing a user. */
 export interface NamedField extends Field {
@@ -23,6 +23,14 @@ export interface NamedField extends Field {
 export interface DatasetEntry {
   key: PntKey;
   record: LexRecord;
+}
+
+export interface ScanEntry {
+  /** Byte offset of the record in the `.bin`. */
+  offset: number;
+  record: LexRecord;
+  /** True when this record began a run, i.e. it carried the run-key fields. */
+  runStart: boolean;
 }
 
 const joinPath = (dir: string, name: string) => (dir ? `${dir}/${name}` : name);
@@ -174,29 +182,160 @@ export class Dataset {
   }
 
   /**
-   * Every record, in key order.
+   * The records the index points at — one per run, not one per record.
    *
-   * This pulls the whole `.bin` into memory, because walking 400 MB two bytes
-   * at a time is not what the range-read path is for. Use it from the CLI, not
-   * from the browser — `A/VIN.BIN` alone is 76 MB.
+   * For most datasets the index covers every record, but for the navigation
+   * and parts tables it does not: see `scan`.
    */
-  async *records(): AsyncGenerator<DatasetEntry> {
-    const size = await this.bin.size();
-    const whole = new BytesReader(await this.bin.read(0, size));
+  async *indexEntries(): AsyncGenerator<DatasetEntry> {
+    const whole = await this.whole();
     for (let i = 0; i < this.index.count; i++) {
       const offset = this.index.offsetAt(i);
-      const header = await whole.read(offset, 2);
-      const length = header[0]! | (header[1]! << 8);
-      const body = await whole.read(offset + 2, length);
-      const { record, used } = decodeRecord(body, this.fdt);
-      if (used !== length) {
-        throw new Error(
-          `${this.name} entry ${i} (key ${String(this.index.keyAt(i))}): ` +
-            `fields consumed ${used} of ${length} declared bytes`,
-        );
-      }
+      const { record } = this.decodeAt(whole, offset, `entry ${i}`);
       yield { key: this.index.keyAt(i), record };
     }
+  }
+
+  /**
+   * Every record in the `.bin`, in storage order, with run-key fields carried
+   * forward.
+   *
+   * **The index does not cover every record.** It points at the first record of
+   * each run: 259 entries for `SGroup`'s 34,555 records, 5,150 for a
+   * catalogue's 77,556. Records after the first in a run omit the fields that
+   * have not changed, and those fields have to be inherited from the preceding
+   * record or the row is meaningless — a part with no PNC and no model.
+   *
+   * `inherit` must list only the run-key fields. Carrying *every* absent field
+   * forward is wrong and dangerously so: `E1` (OPC) and `E2` (Classification)
+   * are per-record applicability, and propagating them makes a part look like
+   * it fits a vehicle it does not. On one plate that turns 1 option-restricted
+   * part into 42. See `deriveRunKey` for how the right set is established.
+   *
+   * This pulls the whole `.bin` into memory. That is what the CLI wants, and
+   * what the browser wants for a single catalogue (a few MB); it is not what
+   * either wants for `VIN.BIN` at 76 MB.
+   */
+  async *scan(inherit: readonly string[] = []): AsyncGenerator<ScanEntry> {
+    const whole = await this.whole();
+    const carry: LexRecord = {};
+    let at = 0;
+    while (at + 2 <= whole.length) {
+      const length = whole[at]! | (whole[at + 1]! << 8);
+      if (length === 0) break;
+      const { record } = this.decodeAt(whole, at, `offset ${at}`);
+      for (const code of inherit) {
+        const value = record[code];
+        if (value !== undefined) carry[code] = value;
+        else if (carry[code] !== undefined) record[code] = carry[code]!;
+      }
+      yield {
+        offset: at,
+        record,
+        runStart: inherit.length === 0 || record[inherit[0]!] !== undefined,
+      };
+      at += 2 + length;
+    }
+    if (at !== whole.length) {
+      throw new Error(`${this.name}: sequential scan ended at ${at} of ${whole.length} bytes`);
+    }
+  }
+
+  /** Byte offsets of every record, for checking the index lands on boundaries. */
+  async recordOffsets(): Promise<Set<number>> {
+    const whole = await this.whole();
+    const offsets = new Set<number>();
+    let at = 0;
+    while (at + 2 <= whole.length) {
+      const length = whole[at]! | (whole[at + 1]! << 8);
+      if (length === 0) break;
+      offsets.add(at);
+      at += 2 + length;
+    }
+    return offsets;
+  }
+
+  private cachedWhole?: Uint8Array;
+
+  private async whole(): Promise<Uint8Array> {
+    this.cachedWhole ??= await this.bin.read(0, await this.bin.size());
+    return this.cachedWhole;
+  }
+
+  private decodeAt(whole: Uint8Array, offset: number, where: string) {
+    const length = whole[offset]! | (whole[offset + 1]! << 8);
+    const { record, used } = decodeRecord(
+      whole.subarray(offset + 2, offset + 2 + length),
+      this.fdt,
+    );
+    if (used !== length) {
+      throw new Error(`${this.name} ${where}: fields consumed ${used} of ${length} declared bytes`);
+    }
+    return { record, length };
+  }
+
+  /**
+   * Work out which fields may be inherited, from the data.
+   *
+   * The property that matters is **never present in a continuation record**. A
+   * field that only ever appears where a run begins can be carried forward
+   * safely; a field that also appears mid-run is per-record data, and carrying
+   * it forward invents values. For a catalogue `A1`, `A2`, `B1`, `B2` never
+   * continue, while `E1` (OPC) appears in 35% of continuation records.
+   *
+   * "Present in every run start" is *not* the right test, though it looks like
+   * it on the biggest catalogues: a single-model catalogue omits `A2` even at
+   * run starts, so that test drops `A2` for three of the 52 and the derived key
+   * would disagree with itself between files.
+   *
+   * `alwaysAtStart` is reported too, since a field in `neverContinued` but not
+   * in `alwaysAtStart` is one whose first record simply did not set it.
+   */
+  async deriveRunKey(): Promise<{
+    runKey: string[];
+    neverContinued: string[];
+    alwaysAtStart: string[];
+    records: number;
+    runs: number;
+  }> {
+    const whole = await this.whole();
+    const first = this.fdt.tree[0]!.code;
+    const atStart = new Map<string, number>();
+    const later = new Map<string, number>();
+    let records = 0;
+    let runs = 0;
+    let at = 0;
+    while (at + 2 <= whole.length) {
+      const length = whole[at]! | (whole[at + 1]! << 8);
+      if (length === 0) break;
+      const { record } = this.decodeAt(whole, at, `offset ${at}`);
+      const isStart = record[first] !== undefined;
+      if (isStart) runs++;
+      const bucket = isStart ? atStart : later;
+      for (const field of this.fdt.tree) {
+        if (record[field.code] !== undefined) {
+          bucket.set(field.code, (bucket.get(field.code) ?? 0) + 1);
+        }
+      }
+      records++;
+      at += 2 + length;
+    }
+    if (records === runs) {
+      return { runKey: [], neverContinued: [], alwaysAtStart: [], records, runs };
+    }
+    const neverContinued = this.fdt.tree
+      .filter((f) => (later.get(f.code) ?? 0) === 0)
+      .map((f) => f.code);
+    const alwaysAtStart = this.fdt.tree
+      .filter((f) => (atStart.get(f.code) ?? 0) === runs)
+      .map((f) => f.code);
+    return {
+      runKey: neverContinued.filter((c) => alwaysAtStart.includes(c)),
+      neverContinued,
+      alwaysAtStart,
+      records,
+      runs,
+    };
   }
 
   async close(): Promise<void> {

@@ -11,18 +11,44 @@ vehicle it does not fit, and nothing in a passing test run will tell you.
 ## Before you finish
 
 ```sh
-python3 re/tools/verify.py <a merged media tree>/M60
+pnpm check                              # build, typecheck, unit tests
+masax verify <a merged media tree>/M60
 ```
 
-Expect `1889570/1889570 records decode exactly (100.0000%)`. Against a fully
-updated installation, expect `3854258/3854258`. **Anything less than 100% is a
-regression**, not an acceptable margin — the format is fully understood, so a
-single failing record means the change is wrong or the input is damaged.
+Expect `9495097 records decode exactly, 1889570 of them reachable through an
+index`. **Anything less is a regression**, not an acceptable margin — the format
+is understood, so a single failing record means the change is wrong or the input
+is damaged.
 
-`verify.py` is the whole test suite on purpose. The check it performs — decode
-every record and assert it consumes exactly its declared payload length — is
-strong enough that no unit test has yet caught something it missed. It found
-every bug listed below.
+`masax verify` is the integration suite on purpose. It decodes every record in
+storage order, and additionally checks that the walk ends exactly at the end of
+the file, that every index offset lands on a record boundary, and that the
+declared run keys still match the data. It found every bug listed below.
+
+`re/tools/*.py` is the original Python reader, kept as a differential oracle for
+the parts of the format it covers. It is **not** authoritative: it validated only
+the indexed records, which is how the record count came to be understated by a
+factor of five.
+
+## The index does not enumerate the file
+
+This is the mistake that cost the most. `filesize / entry_size` on a `.pnt`
+gives the number of _index entries_; the `.bin` holds far more records, and the
+index points at the first record of each run. `SGroup` has 259 entries and
+34,555 records.
+
+Two consequences:
+
+- **Validating "every record" means a sequential walk**, not iterating the
+  index. An earlier `verify` iterated the index, reported 1,889,570 records and
+  100%, and was reading a fifth of the data. Everything it read was correct,
+  which is what made it convincing.
+- **Continuation records inherit the fields they omit.** Read without
+  inheritance they are parts with no PNC and no model, and read with _blanket_
+  inheritance they acquire applicability they do not have. Only the run key is
+  inherited; see `docs/data-format.md`. The safe test for an inheritable field
+  is "never present in a continuation record" — not "present at every run
+  start", which is data-dependent and disagrees between catalogues.
 
 ## The format code
 
@@ -58,7 +84,7 @@ before being caught:
 Reflected CRC32, poly `0xEDB88320`, **accumulator initialised to 0 and no final
 complement**. The binary's own error strings call it "CRC32", and the table at
 `0x41c7ec` is the standard one, so it is easy to conclude the algorithm is
-standard and the *input* must be unusual — and then to go hunting for the right
+standard and the _input_ must be unusual — and then to go hunting for the right
 byte range. It is the other way round: the input is the whole file and the
 init/final are non-standard.
 
@@ -70,7 +96,7 @@ against the checksums alone.
 
 ## Illustrations are not TIFFs
 
-They are named `*.tif` and they are TIFFs *after* XOR-ing with `0x0b` -- except
+They are named `*.tif` and they are TIFFs _after_ XOR-ing with `0x0b` -- except
 byte 0, which uses `0x31`. Two ways to lose a lot of time here:
 
 - **XOR `0x0b` alone gives `73 49 2a 00`**, one byte off `II*\0`. "Nearly TIFF"
@@ -80,7 +106,7 @@ byte 0, which uses `0x31`. Two ways to lose a lot of time here:
   Group 4, so entropy is 7.59 bits/byte, all 256 byte values occur, and
   index-of-coincidence is flat at every period from 1 to 64. Every measurement
   says "this is a compression format" and every one of them is a true statement
-  about the *plaintext*. Do not let it rule out a cipher on top.
+  about the _plaintext_. Do not let it rule out a cipher on top.
 
 `docs/data-format.md` asserted these were plain TIFFs for one commit. The check
 that caught it was running `file`-equivalent logic on the bytes rather than
@@ -135,12 +161,11 @@ guessing at bytes, but know what each one actually is:
 
 Nothing in the format required a decompiler in the end; the `.ddm` comments and
 the `.fdt` layout tables are self-describing enough to validate against the
-data. Reach for Ghidra for semantics — what a flag *means* — rather than for
+data. Reach for Ghidra for semantics — what a flag _means_ — rather than for
 layout.
 
 ## Scope
 
-This covers module **M60**, the European passenger-car catalogue, September
-2008. `ASAMAIN.ini` also configures `M00`, `M50` and `M80`; those use the same
+This covers module **M60**, the European passenger-car catalogue, September 2008. `ASAMAIN.ini` also configures `M00`, `M50` and `M80`; those use the same
 engine and very likely the same format, but no claim here has been checked
 against them. If you add one, say so in the docs and give it its own verify run.

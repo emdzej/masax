@@ -13,16 +13,24 @@ The container format, the schema, the illustrations, the update packages and
 their checksum are all decoded.
 
 ```
-$ python3 re/tools/verify.py <media>/M60
-1889570/1889570 records decode exactly (100.0000%)
+$ masax verify <media>/M60
+9495097 records decode exactly, 1889570 of them reachable through an index
 ```
 
-That is every record of every dataset on the original media, each one checked
-to consume exactly its declared payload length. A fully updated installation
-(`EPC/DATA2`, update level 89) also reads at 100% — 3,854,258 records.
+That is every record of every dataset on the original media, each checked to
+consume exactly its declared payload length, plus three structural invariants:
+the sequential walk ends exactly at the end of the file, every index offset
+lands on a record boundary, and the declared run keys match the data.
 
-Every one of the 18,760 parts drawings decodes to a valid CCITT Group 4 TIFF.
-They are stored as `*.tif` but are **not** TIFFs until de-obfuscated — see
+The gap between the two numbers is the point: the `.pnt` index covers only about
+a fifth of the records. It points at the first record of a **run**, and later
+records in a run inherit the fields they omit — see
+[`docs/data-format.md`](docs/data-format.md#runs-and-the-fields-a-record-inherits).
+
+Every one of the parts drawings decodes: 10,694 of 10,694 on disc B, none
+failing. They are stored as `*.tif` but are **not** TIFFs until de-obfuscated,
+and the Group 4 decoder in `packages/illust` is pixel-identical to a reference
+decoder on every drawing tested — see
 [`docs/data-format.md`](docs/data-format.md#illustrations).
 
 Joins are proven, not assumed. Walking VIN → model → group → plate → parts on
@@ -30,12 +38,17 @@ catalogue `B6037609A` yields real, correctly described parts:
 
 ```
 model L042G, main group 13, subgroup 010   (plate 113_0103KC1A0T)
-PNC      PartNumber   Qty  from      to        description
-05100A   MB247182     01   1983011   1986043   FUEL TANK ASSY
-05114    MB247387     01   1983011   1986043   CAP,FUEL TANK
-05145    MB408473     01   1983011   1987053   GAUGE UNIT,FUEL TANK
-05152    MB129895     01   1983011   1991061   FILTER,FUEL IN TANK
+PNC     part        from     to       classification
+05021   MB247230    1983011  1986043  -
+05021   MB247230    1986051  1991061  NJL6,VNJL6,VNJR6
+05021   MB504621    1986051  1991061  NJQL6,VNJQL6
+05100A  MB247182    1983011  1986043  -
+05100A  MB248375    1986051  1987053  NJL6,NJQL6,VNJL6,VNJQL6,VNJR6
 ```
+
+42 parts across 30 part-name codes on that one plate — two part numbers for
+`05021` in the same date window, separated by classification, which is what
+applicability is.
 
 The drawing for that plate, `113_0103KC1A0T.tif`, carries exactly those callout
 numbers — an independent check on both the joins and the image decode.

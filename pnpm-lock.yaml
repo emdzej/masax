@@ -35,6 +35,9 @@ importers:
       '@masax/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@masax/illust':
+        specifier: workspace:*
+        version: link:../../packages/illust
       '@masax/lex':
         specifier: workspace:*
         version: link:../../packages/lex
@@ -59,6 +62,8 @@ importers:
         version: link:../lex
 
   packages/core: {}
+
+  packages/illust: {}
 
   packages/lex:
     dependencies:

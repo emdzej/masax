@@ -1,10 +1,19 @@
 /**
  * `masax verify` — the regression test for the format code.
  *
- * Decodes every record of every dataset and checks each one consumes exactly
- * its declared payload length. That check is strong: it is what caught the
- * array count width, the short presence bitmap and the integer endianness,
- * each of which had already passed on most of the data.
+ * Every record of every dataset is decoded in storage order and checked to
+ * consume exactly its declared payload length. Three further invariants are
+ * checked because each one was, at some point, wrong:
+ *
+ *  - the sequential scan must end exactly at the end of the file, so no record
+ *    is skipped and none is invented;
+ *  - every `.pnt` offset must land on a record boundary;
+ *  - the run key derived from the data must match the one declared in
+ *    `@masax/catalogue`, so a declaration cannot quietly go stale.
+ *
+ * The index covers only the first record of each run, so an earlier version of
+ * this command validated 1.9 M records and believed that was all of them. It is
+ * really 5.6 M.
  */
 import chalk from "chalk";
 import { Dataset, findVariants, parseDdm, parseFdt, resolveFile } from "@masax/lex";
@@ -15,28 +24,26 @@ export interface VerifyOptions {
   generation: 1 | 2;
   schema: boolean;
   only?: string;
+  runKeys: boolean;
 }
 
 interface Result {
-  location: DatasetLocation;
-  variant?: string;
-  rows: number;
-  clean: number;
-  error?: string;
+  label: string;
+  records: number;
+  indexed: number;
+  problems: string[];
 }
 
 /**
  * Catalogue ids come from `CInfo`, which lists them authoritatively.
  *
- * They must not be discovered from the filenames: `catalog`'s template is
- * `@.bin`, which glob-matches every `.bin` in the directory. An earlier sweep
- * did exactly that and reported a format failure that was really `PBOOK.BIN`
- * and `DESC_GB.BIN` being counted as catalogues.
+ * They must not be discovered from filenames: `catalog`'s template is `@.bin`,
+ * which glob-matches every `.bin` in the directory.
  */
 async function catalogueIds(source: NodeSource, dir: string): Promise<string[]> {
   const cinfo = await Dataset.open(source, dir, "CInfo");
   const ids: string[] = [];
-  for await (const { record } of cinfo.records()) {
+  for await (const { record } of cinfo.indexEntries()) {
     const id = record["A0"];
     if (typeof id === "string" && id) ids.push(id);
   }
@@ -80,71 +87,128 @@ export async function verify(root: string, options: VerifyOptions): Promise<numb
     try {
       variants = await variantsFor(source, location, catalogues);
     } catch (error) {
-      if (location.optional) continue;
-      results.push({ location, rows: 0, clean: 0, error: (error as Error).message });
+      if (!location.optional) {
+        results.push({
+          label: `${location.dir}/${location.name}`,
+          records: 0,
+          indexed: 0,
+          problems: [(error as Error).message],
+        });
+      }
       continue;
     }
 
     let present = 0;
-    let rows = 0;
-    let clean = 0;
-    let firstError: string | undefined;
+    let records = 0;
+    let indexed = 0;
+    const problems: string[] = [];
 
     for (const variant of variants) {
       let dataset: Dataset;
       try {
         dataset = await Dataset.open(source, location.dir, location.name, variant);
       } catch {
-        continue; // no data files for this variant
+        continue;
       }
       present++;
       if (options.schema) console.log(describeSchema(dataset));
+      indexed += dataset.count;
 
       const sorted = dataset.index.checkSorted();
-      if (!sorted.ok) {
-        firstError ??= `${location.name}: .pnt is not sorted at entry ${sorted.at}`;
-      }
+      if (!sorted.ok) problems.push(`.pnt is not sorted at entry ${sorted.at}`);
 
-      rows += dataset.count;
       try {
-        for await (const _entry of dataset.records()) clean++;
+        const declared = location.runKey ?? [];
+        const derived = await dataset.deriveRunKey();
+        if (options.runKeys) {
+          console.log(
+            `  ${location.name}${variant ? `[${variant}]` : ""}: ` +
+              `${derived.records} records, ${derived.runs} runs, ` +
+              `never continued [${derived.neverContinued.join(", ")}]`,
+          );
+        } else {
+          // Declaring a field inherited is only safe if the data never carries
+          // it mid-run. The reverse is fine: a field that never continues but
+          // is not declared simply is not carried forward.
+          const unsafe = declared.filter((c) => !derived.neverContinued.includes(c));
+          if (unsafe.length > 0) {
+            problems.push(
+              `inheriting [${unsafe.join(", ")}] is unsafe: the data sets ` +
+                `${unsafe.length === 1 ? "it" : "them"} in continuation records too`,
+            );
+          }
+          // `runs === 0` means the dataset never sets its first field at all —
+          // `ASP` is like that — so there is nothing to inherit from.
+          if (derived.runs > 0 && derived.records > derived.runs && declared.length === 0) {
+            problems.push(
+              `${derived.records - derived.runs} records continue a run but no run key is declared`,
+            );
+          }
+        }
+
+        const offsets = await dataset.recordOffsets();
+        for (let i = 0; i < dataset.index.count; i++) {
+          const offset = dataset.index.offsetAt(i);
+          if (!offsets.has(offset)) {
+            problems.push(`.pnt entry ${i} points at ${offset}, not a record boundary`);
+            break;
+          }
+        }
+
+        // A run-key field can legitimately stay undefined: a single-model
+        // catalogue never sets `A2`, so there is nothing to carry. The scan
+        // itself is the check — it fails if the file does not frame exactly.
+        for await (const _entry of dataset.scan(declared)) records++;
       } catch (error) {
-        firstError ??= (error as Error).message;
+        problems.push((error as Error).message);
       }
       await dataset.close();
+      if (problems.length > 0) break;
     }
 
     if (present === 0) {
       if (!location.optional) {
-        results.push({ location, rows: 0, clean: 0, error: "no data files present" });
+        results.push({
+          label: `${location.dir}/${location.name}`,
+          records: 0,
+          indexed: 0,
+          problems: ["no data files present"],
+        });
       }
       continue;
     }
-    results.push({ location, rows, clean, error: firstError });
+    results.push({
+      label: `${location.dir}/${location.name}`,
+      records,
+      indexed,
+      problems,
+    });
   }
 
-  let totalRows = 0;
-  let totalClean = 0;
+  let totalRecords = 0;
+  let totalIndexed = 0;
   let failed = 0;
   for (const r of results) {
-    totalRows += r.rows;
-    totalClean += r.clean;
-    const label = `${r.location.dir}/${r.location.name}`;
-    if (r.error) {
+    totalRecords += r.records;
+    totalIndexed += r.indexed;
+    if (r.problems.length > 0) {
       failed++;
-      console.log(`${chalk.red("FAIL")} ${label.padEnd(26)} ${r.clean}/${r.rows}  ${r.error}`);
+      console.log(`${chalk.red("FAIL")} ${r.label.padEnd(26)} ${r.problems[0]}`);
     } else {
       console.log(
-        `${chalk.green("ok  ")} ${label.padEnd(26)} ${String(r.clean).padStart(8)}/${String(r.rows).padEnd(8)} clean`,
+        `${chalk.green("ok  ")} ${r.label.padEnd(26)} ` +
+          `${String(r.records).padStart(9)} records  ` +
+          `${String(r.indexed).padStart(8)} indexed`,
       );
     }
   }
 
-  const pct = totalRows === 0 ? 0 : (100 * totalClean) / totalRows;
-  const line = `${totalClean}/${totalRows} records decode exactly (${pct.toFixed(4)}%)`;
   console.log("");
+  const line =
+    `${totalRecords} records decode exactly, ` +
+    `${totalIndexed} of them reachable through an index`;
   console.log(failed === 0 ? chalk.green(line) : chalk.red(line));
-  return failed === 0 && totalClean === totalRows ? 0 : 1;
+  return failed === 0 ? 0 : 1;
 }
 
 function describeSchema(dataset: Dataset): string {

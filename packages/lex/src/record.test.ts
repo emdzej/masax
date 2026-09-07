@@ -212,3 +212,78 @@ describe("integers", () => {
     expect(record["A0"]).toBe(-1);
   });
 });
+
+describe("runs and inheritance", () => {
+  // The .pnt index points at the first record of a run; later records omit the
+  // fields that have not changed. Reading them without inheriting leaves a
+  // part with no PNC and no model.
+  const fdt = parseFdt(
+    buildFdt({
+      fields: [
+        { code: "A1", width: 7, type: FieldType.VarStr, label: "PNC" },
+        { code: "A2", width: 7, type: FieldType.VarStr, label: "Model" },
+        { code: "D1", width: 17, type: FieldType.VarStr, label: "PartNumber" },
+        { code: "E1", width: 4, type: FieldType.FixStr, label: "OPC" },
+      ],
+      keys: ["A1"],
+      binTemplate: "@.bin",
+      pntTemplate: "@.pnt",
+      sparse: true,
+    }),
+  );
+
+  /** Apply the inheritance rule the way `Dataset.scan` does. */
+  function scan(bodies: Uint8Array[], inherit: string[]) {
+    const carry: Record<string, unknown> = {};
+    return bodies.map((body) => {
+      const { record } = decodeRecord(body, fdt);
+      for (const code of inherit) {
+        if (record[code] !== undefined) carry[code] = record[code];
+        else if (carry[code] !== undefined) record[code] = carry[code] as never;
+      }
+      return { ...record };
+    });
+  }
+
+  const runStart = new Uint8Array([
+    ...bitmap([0, 1, 2], 1),
+    6,
+    ...ascii("05100A"),
+    5,
+    ...ascii("L042G"),
+    8,
+    ...ascii("MB247182"),
+  ]);
+  // A continuation: part number only, and its own OPC.
+  const continuation = new Uint8Array([
+    ...bitmap([2, 3], 1),
+    8,
+    ...ascii("MB554417"),
+    ...ascii("A50 "),
+  ]);
+
+  it("carries the run key forward but not per-record fields", () => {
+    const rows = scan([runStart, continuation], ["A1", "A2"]);
+    expect(rows[0]).toEqual({ A1: "05100A", A2: "L042G", D1: "MB247182" });
+    expect(rows[1]).toEqual({ A1: "05100A", A2: "L042G", D1: "MB554417", E1: "A50" });
+  });
+
+  it("leaves a continuation unusable without inheritance", () => {
+    const rows = scan([runStart, continuation], []);
+    expect(rows[1]!["A1"]).toBeUndefined();
+    expect(rows[1]!["A2"]).toBeUndefined();
+  });
+
+  it("does not invent an OPC for a part that has none", () => {
+    // Inheriting every absent field would give the third record the second's
+    // OPC. On one real plate that turns 1 option-restricted part into 42, and
+    // the result is a part shown as fitting a vehicle it does not.
+    const noOpc = new Uint8Array([...bitmap([2], 1), 8, ...ascii("MB554422")]);
+    const wrong = scan([runStart, continuation, noOpc], ["A1", "A2", "D1", "E1"]);
+    expect(wrong[2]!["E1"]).toBe("A50");
+
+    const right = scan([runStart, continuation, noOpc], ["A1", "A2"]);
+    expect(right[2]!["E1"]).toBeUndefined();
+    expect(right[2]!["A1"]).toBe("05100A");
+  });
+});
