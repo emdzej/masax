@@ -297,6 +297,50 @@ third of the month: `1` early, `2` mid, `3` late. `1983011` is early January
 1983; `1991061` early June 1991. Verified against the whole distribution —
 only 1, 2 and 3 ever appear in the last position and months stay in 1–12.
 
+### VIN and the `Vin` dataset
+
+`Vin` is keyed on a **7-character serial**, and each record stores a chassis
+prefix. Together they make the VIN:
+
+```
+JMBGNPD5VS   +   A000003   =   JMBGNPD5VSA000003
+chassis (A1)     serial (A0)
+```
+
+**Split from the right.** Only the serial has a fixed length. Measured over all
+5,418,637 records: the serial is 7 characters in _every_ one, while the chassis
+is 10 in 99.26% and **7 in 39,986** of them (plus twelve at 4 and 6). Those are
+vehicles whose chassis number predates the 17-character VIN, and a decoder that
+insists on 17 characters rejects forty thousand valid ones.
+
+One serial carries many vehicles — `A000001` has 66, and one run reaches 316 —
+so the chassis prefix is what disambiguates. Index offsets are monotonic, so the
+run is one bounded read: 186 bytes on average against a 76 MB file.
+
+#### Most records point elsewhere for the specification
+
+Only **167,446 records (3.1%)** carry the model, classification, OPC, paint and
+trim. The other **5,251,191 (96.9%)** carry a serial, a chassis, a build date
+and field **`A2`, an XREF** — the serial of another record that holds the
+specification for that chassis. None have neither.
+
+```
+J000188 + JMB0RV250R  ->  XREF J000153
+J000153 + JMB0RV250R  ->  model V25W, class GRXML6, OPC H70, paint D9H
+```
+
+Following it is not an optimisation. Without it a valid VIN decodes to a build
+date and nothing else, which reads as "not in the data" — and that is what 96.9%
+of VINs did before this was found. Resolution is: match the chassis in the
+XREF'd serial's run, take the fields this record lacks, keep this record's own
+build date, and cap the hops in case the data has a cycle.
+
+**Do not reach for inheritance here.** The catalogue tables carry absent fields
+forward from the record above; `Vin` does not work that way, and doing it gives
+a confidently wrong answer. For `JMB0RV250R` the nearest preceding record with a
+model says `V23W` — the 2.3 litre — where the XREF says `V25W`. Same plate, wrong
+engine.
+
 ### Illustrations
 
 **The files under `ILLUST/` are named `*.tif` but are not TIFFs as stored.**

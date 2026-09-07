@@ -161,13 +161,30 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
     expect(ink).toBeLessThan(960 * 1210 * 0.5);
   });
 
-  it("decodes a VIN against the vehicle data", async () => {
-    await page.getByPlaceholder("17-character VIN").fill("JMAGZP02VHA000001");
+  it("decodes a VIN that carries its own specification", async () => {
+    // One of the 3.1% of records that hold the model directly.
+    await page.getByPlaceholder(/VIN/).fill("JMAGZP02VHA000001");
     await page.getByRole("button", { name: "Decode" }).click();
     const vehicle = page.locator("dl.vehicle");
     await expect.poll(() => vehicle.count(), { timeout: 30_000 }).toBeGreaterThan(0);
     const text = await vehicle.first().textContent();
     expect(text).toContain("P02V");
     expect(text).toContain("1986-11");
+  });
+
+  it("follows the XREF for a VIN whose record has no specification", async () => {
+    // The other 96.9%. Before the XREF was followed this decoded to a build
+    // date and nothing else, which reads as "not in the data".
+    await page.getByPlaceholder(/VIN/).fill("JMB0RV250RJ000188");
+    await page.getByRole("button", { name: "Decode" }).click();
+    const vehicle = page.locator("dl.vehicle").first();
+    await expect
+      .poll(() => vehicle.textContent(), { timeout: 30_000 })
+      .toContain("V25W");
+    const text = await vehicle.textContent();
+    expect(text).toContain("GRXML6");
+    expect(text).toContain("1994-03");
+    // and the interface says where the specification came from
+    expect(await page.locator(".via").first().textContent()).toContain("J000153");
   });
 });

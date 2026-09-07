@@ -216,7 +216,7 @@
         <div class="row">
           <input
             bind:value={app.vinInput}
-            placeholder="17-character VIN"
+            placeholder="VIN or chassis + serial"
             spellcheck="false"
             onkeydown={(e) => e.key === "Enter" && app.lookupVin()}
           />
@@ -238,6 +238,12 @@
               <dt>Interior</dt>
               <dd>{vehicle.interior ?? "—"}</dd>
             </dl>
+            {#if vehicle.specFrom}
+              <p class="via">
+                Specification recorded against serial <code>{vehicle.specFrom}</code>,
+                reached from this one's cross-reference.
+              </p>
+            {/if}
           {/each}
         {/if}
       </section>
@@ -545,6 +551,15 @@
   }
   .vehicle dd {
     margin: 0;
+    font-family: var(--mono);
+  }
+  .via {
+    margin: 0.4rem 0 0;
+    color: var(--dim);
+    font-size: 0.75rem;
+    line-height: 1.35;
+  }
+  .via code {
     font-family: var(--mono);
   }
   select[size] {

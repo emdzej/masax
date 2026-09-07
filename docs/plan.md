@@ -72,7 +72,9 @@ picked directories, and `csfs-opfs` can hold a copy for offline use.
 
 Unlike the Renault equivalent, **VIN decoding works locally**: `Vin` holds 5.4 M
 records across the two halves, and identification is a lookup rather than an
-algorithm.
+algorithm. Note that 96.9% of those records hold no specification themselves and
+point at another serial through an XREF — see
+[`data-format.md`](data-format.md#most-records-point-elsewhere-for-the-specification).
 
 ## 3. Architecture
 

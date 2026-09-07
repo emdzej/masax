@@ -94,6 +94,28 @@ Prove that direction rather than assuming it: update 089's `PNC.U11` adds PNCs
 side of the patch its checksum represents. Both readings are self-consistent
 against the checksums alone.
 
+## Vin points elsewhere for the specification
+
+Only 3.1% of `Vin` records carry the model, class, OPC and paint. The other
+96.9% carry field `A2`, an **XREF** to the serial that does. Follow it or almost
+every VIN decodes to a build date and nothing else — which looks exactly like
+"not in the data", and is how this went unnoticed: the first VIN tested happened
+to be in the 3%.
+
+Two traps around it:
+
+- **Do not solve it with inheritance.** Carrying absent fields forward from the
+  record above is right for the catalogue tables and wrong here, and wrong
+  _confidently_: for chassis `JMB0RV250R` the nearest preceding record with a
+  model says `V23W`, the 2.3 litre, where the XREF says `V25W`.
+- **Split a VIN from the right.** The serial is 7 characters in all 5,418,637
+  records; the chassis is 10 in 99.26% and **7 in 39,986**. Splitting at a fixed
+  offset from the left rejects those forty thousand as malformed.
+
+Both were found by asking "how often is this actually true?" rather than by
+reading one record. A sample of 150 real VINs across both halves now decodes
+150/150, 144 of them via XREF.
+
 ## Case, across sources
 
 Disc A spells the drawings directory `Illust`; disc B spells it `ILLUST`. An
