@@ -53,8 +53,34 @@ applicability is.
 The drawing for that plate, `113_0103KC1A0T.tif`, carries exactly those callout
 numbers — an independent check on both the joins and the image decode.
 
+## The app
+
+A Svelte 5 client, 30 kB gzipped, no backend. Point it at a mounted disc or a
+static tree and it goes catalogue → model → group → plate: the drawing painted
+to a canvas beside the parts table, with VIN decoding and four languages.
+
+```sh
+pnpm dev                                  # then open a folder in the browser
+masax manifest <media>/M60 -o <media>/M60/manifest.json   # to serve over HTTP
+```
+
+The drawings are Group 4 TIFFs behind a byte obfuscation, so they are decoded in
+the browser rather than converted first — which is what lets the app read a disc
+directly and a static host serve the vendor's own files unchanged.
+
+Four browser tests walk the whole chain over HTTP `Range`, including that the
+canvas is actually painted rather than left blank.
+
+**Applicability is not filtered.** Every part on a plate is shown with its
+conditions visible — OPC, classification, applicable codes, date window. How ASA
+combines those into "fits this vehicle" has not been established here, and a
+wrong filter hides a part that fits or offers one that does not without saying
+so. See [`docs/plan.md`](docs/plan.md#4-order-of-work), phase 5.
+
 ## Read this next
 
+- **[`docs/plan.md`](docs/plan.md)** — why the project is shaped this way, the
+  sizing that makes it client-side, and what is deliberately not done yet.
 - **[`docs/data-format.md`](docs/data-format.md)** — the format specification:
   `.ddm`/`.fdt`/`.bin`/`.pnt`, the presence bitmap, groups and arrays, the
   Mitsubishi schema, date encoding, illustration naming.
@@ -76,29 +102,29 @@ September 2008.
 
 ## Tools
 
-```
-re/tools/lexdb.py     the reader: .ddm/.fdt/.bin/.pnt
-re/tools/verify.py    decode everything and check every record's length
-re/tools/illust.py    de-obfuscate the parts drawings
-re/tools/deillust.py  convert or validate an ILLUST tree
-re/tools/unwise.py    extract the payloads from an asacm60e*.exe update
-re/tools/delta.py     parse the .U<nn> record deltas
-re/tools/stage.sh     copy the PE binaries worth decompiling into re/bin/
-```
-
 ```sh
-# extract the original media and verify it
+pnpm install && pnpm build
+
+# extract the original media
 unzip -p ASA_EUROPE.zip MMC_ASA_EUR_A.iso | bsdtar -xf - -C out/
 unzip -p ASA_EUROPE.zip MMC_ASA_EUR_B.iso | bsdtar -xf - -C out/
-python3 re/tools/verify.py out/M60
 
-# print the schema of every dataset
-python3 re/tools/verify.py out/M60 --schema
+masax verify out/M60                 # every record, every invariant
+masax verify out/M60 --schema        # print each dataset's schema
+masax verify out/M60 --run-keys      # what the data says about inheritance
 
-# the drawings are XOR-obfuscated TIFFs -- check and convert them
-python3 re/tools/deillust.py --check out/M60/ILLUST
-python3 re/tools/deillust.py --all out/M60/ILLUST tiffs/
+masax show out/M60                                  # list catalogues
+masax show out/M60 B6037609A L042G 13 10            # a plate and its parts
+masax vin  out/M60 JMAGZP02VHA000001                # decode a VIN
+
+masax illust out/M60/ILLUST --check                 # decode every drawing
+masax illust out/M60/ILLUST -o png/ --png           # convert them
+masax manifest out/M60 -o out/M60/manifest.json     # to serve over HTTP
 ```
+
+`re/tools/*.py` is the original Python reader, kept as a differential oracle for
+the parts of the format it covers. It is not authoritative — it validated only
+the indexed records, which understated the record count fivefold.
 
 ## Licence and intent
 

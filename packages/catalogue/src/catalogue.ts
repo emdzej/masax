@@ -170,9 +170,18 @@ export class AsaCatalogue {
     return [...seen].sort();
   }
 
-  private toGroup(record: LexRecord, withSubGroup: boolean): GroupRef {
+  /**
+   * Undefined when the record carries no main group.
+   *
+   * `MGroup`'s run key does not include `A2`, so a record may legitimately
+   * omit it. Defaulting that to 0 puts a nameless "group 0" at the top of the
+   * navigation; dropping it is honest.
+   */
+  private toGroup(record: LexRecord, withSubGroup: boolean): GroupRef | undefined {
+    const mainGroup = int(record, "A2");
+    if (mainGroup === undefined) return undefined;
     return {
-      mainGroup: int(record, "A2") ?? 0,
+      mainGroup,
       subGroup: withSubGroup ? int(record, "A3") : undefined,
       name: this.text.get(int(record, "A6")),
       note: this.text.get(int(record, "A7")),
@@ -191,7 +200,7 @@ export class AsaCatalogue {
     for (const record of this.mainGroups) {
       if (text(record, "A0") !== id || text(record, "A1") !== model) continue;
       const group = this.toGroup(record, false);
-      if (seen.has(group.mainGroup)) continue;
+      if (!group || seen.has(group.mainGroup)) continue;
       seen.add(group.mainGroup);
       out.push(group);
     }
@@ -204,7 +213,8 @@ export class AsaCatalogue {
     for (const record of this.subGroups) {
       if (text(record, "A0") !== id || text(record, "A1") !== model) continue;
       if ((int(record, "A2") ?? -1) !== mainGroup) continue;
-      out.push(this.toGroup(record, true));
+      const group = this.toGroup(record, true);
+      if (group) out.push(group);
     }
     return out.sort((a, b) => (a.subGroup ?? 0) - (b.subGroup ?? 0));
   }
@@ -221,7 +231,8 @@ export class AsaCatalogue {
     for (const record of this.plates) {
       if (text(record, "A0") !== id || text(record, "A1") !== model) continue;
       if ((int(record, "A2") ?? -1) !== mainGroup) continue;
-      out.push(this.toGroup(record, true));
+      const group = this.toGroup(record, true);
+      if (group) out.push(group);
     }
     return out.sort((a, b) => (a.subGroup ?? 0) - (b.subGroup ?? 0));
   }

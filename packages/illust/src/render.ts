@@ -11,15 +11,21 @@
  */
 import type { Bitmap } from "./g4.js";
 
-/** RGBA pixels for `ImageData`. A set bit is drawn as `black`. */
+/**
+ * RGBA pixels for `ImageData`. A set bit is drawn as `black`.
+ *
+ * Backed by an explicit `ArrayBuffer` so the result is assignable to
+ * `ImageDataArray`; the default allocation widens to `ArrayBufferLike`, which
+ * `new ImageData(...)` rejects because it could be a `SharedArrayBuffer`.
+ */
 export function bitmapToRgba(
   bitmap: Bitmap,
   colours: { black?: [number, number, number]; white?: [number, number, number] } = {},
-): Uint8ClampedArray {
+): Uint8ClampedArray<ArrayBuffer> {
   const [br, bg, bb] = colours.black ?? [0, 0, 0];
   const [wr, wg, wb] = colours.white ?? [255, 255, 255];
   const { width, height, stride, bits } = bitmap;
-  const out = new Uint8ClampedArray(width * height * 4);
+  const out = new Uint8ClampedArray(new ArrayBuffer(width * height * 4));
   let at = 0;
   for (let y = 0; y < height; y++) {
     const row = y * stride;

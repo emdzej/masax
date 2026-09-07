@@ -2,6 +2,7 @@
 import { Command, Option } from "@commander-js/extra-typings";
 import type { Language } from "@masax/core";
 import { checkIllustrations, convertIllustrations, showIllustration } from "./illust.js";
+import { writeManifest } from "./manifest.js";
 import { decodeVin, show } from "./show.js";
 import { verify } from "./verify.js";
 
@@ -58,6 +59,15 @@ program
       generation: options.generation === "2" ? 2 : 1,
       language: options.language as Language,
     });
+  });
+
+program
+  .command("manifest")
+  .description("write the directory listing a static HTTP tree needs")
+  .argument("<root>", "an ASA module directory")
+  .option("-o, --out <file>", "where to write it", "manifest.json")
+  .action(async (root, options) => {
+    process.exitCode = await writeManifest(root, options.out);
   });
 
 program

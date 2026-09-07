@@ -88,11 +88,20 @@ export class BlobReader extends BaseReader {
 export class HttpRangeReader extends BaseReader {
   private cachedSize?: number;
 
+  /**
+   * `fetch` is wrapped rather than stored directly: a bare `fetch` reference
+   * called as a method throws "Illegal invocation" in a browser, because it
+   * needs `window` as its receiver. Node does not care, so this only shows up
+   * once the code actually runs in a page.
+   */
+  private readonly fetchImpl: typeof fetch;
+
   constructor(
     private readonly url: string,
-    private readonly fetchImpl: typeof fetch = fetch,
+    fetchImpl?: typeof fetch,
   ) {
     super();
+    this.fetchImpl = fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
   }
 
   async size(): Promise<number> {
