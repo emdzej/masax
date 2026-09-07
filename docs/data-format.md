@@ -20,7 +20,7 @@ ASA/
     PROG/                  the application, its DLLs, print forms, help
     EPC/DATA1/             catalogue data as shipped on the discs
     EPC/DATA2/             the same data after delta updates were applied
-    ILLUST/<bucket>/       parts drawings, one TIFF per plate
+    ILLUST/<bucket>/       parts drawings, one per plate (obfuscated TIFF)
     UPDATE/, Updates/      delta update staging
     Users/                 baskets, memos, per-user settings
 ```
@@ -220,7 +220,36 @@ only 1, 2 and 3 ever appear in the last position and months stay in 1–12.
 
 ### Illustrations
 
-`MGroup`/`SGroup`/`BGroup` each carry an `Illustration` field holding a TIFF
+**The files under `ILLUST/` are named `*.tif` but are not TIFFs as stored.**
+Every byte is XOR'd with `0x0b`, except byte 0 which uses `0x31`. Undo that and
+you have an ordinary TIFF:
+
+```python
+out = bytearray(b ^ 0x0b for b in data)
+out[0] = data[0] ^ 0x31
+```
+
+They are 1-bit bilevel, **CCITT Group 4**, typically 960x1210 (also 909x1187,
+992x1403, and 294x162 for icons). All 18,760 illustrations in an installation
+decode to a valid TIFF -- verified, none fail:
+
+```sh
+python3 re/tools/deillust.py --check <tree>/M60/ILLUST
+```
+
+The obfuscation sits on top of plain TIFF rather than being a container format:
+`LxidTiff.dll` genuinely tests for the `II*` magic, and `LxidDcod.dll` picks a
+codec by *file extension* (`FUN_6010e220` searches the name for `'.'`), so the
+`.tif` extension is load-bearing even though the stored bytes are not TIFF.
+
+Note the trap: XOR-ing with `0x0b` alone yields `73 49 2a 00` -- "sI\*\0",
+one byte away from the magic -- which reads as "nearly TIFF but not quite" and
+sends you looking for a container. It is only byte 0 that uses a different key.
+Byte frequency is no help either: the payload is Group 4 data, so entropy is
+7.59 bits/byte and index-of-coincidence is flat at every period, which makes the
+file look compressed-and-unobfuscated.
+
+`MGroup`/`SGroup`/`BGroup` each carry an `Illustration` field holding the
 basename. Its first three characters are the subdirectory:
 
 ```
@@ -228,13 +257,91 @@ BGroup.Illustration = "113_0103KC1A0T"  ->  M60/ILLUST/113/113_0103KC1A0T.tif
 MGroup.Illustration = "1@_____300164T"  ->  M60/ILLUST/1@_/1@_____300164T.tif
 ```
 
-`1@_` is a literal directory name — the `@` is not a placeholder here. All
+`1@_` is a literal directory name -- the `@` is not a placeholder here. All
 1,621 distinct `BGroup` illustrations resolve; none are missing. The trailing
 letter distinguishes plate type: `T` for parts plates, `K` for subgroup index
 pages.
 
 Service-parts-news images live in `ILLUST/SPN/` and are named from `SPN.A1`
 ("File Prefix") plus the SPN number and a `#page` suffix.
+
+The drawings independently corroborate the schema. The plate for catalogue
+`B6037609A`, model `L042G`, main group 13, subgroup 010 is
+`113_0103KC1A0T.tif`, and its callouts are exactly the PNCs the catalogue
+returns for that plate -- `05100A` FUEL TANK ASSY, `05114` CAP, `05145` GAUGE
+UNIT, `05152` FILTER, `05265` HOSE. It also carries `REF. 13-020`, matching the
+main-group/subgroup fields, and a date note `(-8301*3)` in the same
+`YYYYMM`+third-of-month form as `StartDate`/`EndDate`.
+
+## Delta updates
+
+Disc A carries `UPDATE/asacm60e056.exe` through `asacm60e089.exe`. Each is a
+**Wise Installer** self-extractor: a ~15 KB PE stub, then an overlay of
+consecutively stored raw-deflate streams. Walking the overlay and inflating
+back to back recovers every payload, so Wise's own per-file headers need not be
+parsed:
+
+```sh
+python3 re/tools/unwise.py UPDATE/asacm60e056.exe out/
+```
+
+A package holds `WiseColors.dib`, `WiseScript.bin`, `Wise0132.dll`, a DeltaUpd
+recipe, the data deltas, and replacement illustrations.
+
+### The recipe
+
+One payload is a plain-text script for `PROG/DeltaUpd.exe`, tab separated, with
+`%0`-`%4` and `%L` standing for the source, update, target, illustration and
+program directories and the new update level:
+
+```
+#9H2%1  DELTAUPD.LOG
+#1%0\DATADESC\*.*   %2
+#A%2\DESC_GB.BIN   DE1700D3   %0\DATEN\DESC_GB.U09   %2\DESC.FDT
+#6%2\OPCMOD.FDT   %2
+#1%0\ILLUST\*.*   %3
+?9J3%4\ASAMAIN.INI   U   M60   UPDLEVEL_EPC   %L
+```
+
+`#A` applies a delta: *target `.bin`*, *an 8-hex-digit checksum of the target*,
+*the delta file*, *the schema `.fdt`*. `#1` copies a file set, `#6` copies a
+single file, `#9H*` sets up logging, and a `?` prefix marks a step as optional.
+The last line is what bumps `UPDLEVEL_EPC` in `ASAMAIN.ini`.
+
+The checksum is what produces the application's "not a valid previous version
+and could not be upgraded" error. **It is not a plain CRC32.** Neither CRC32,
+its complement, a byte-swap, nor Adler-32 over the whole target file reproduces
+any of the published values, against base media or an updated tree. Identifying
+it needs `DeltaUpd.exe` reversed, and until then a delta applier cannot verify
+what it produces.
+
+### The `.U<nn>` delta files
+
+A delta is a flat sequence of operations on one dataset's `.bin`:
+
+| Field | Type | Meaning |
+|---|---|---|
+| offset | u32 | byte offset in the target `.bin` |
+| opcode | u8 | `'A'` add, `'D'` delete, `'U'` update |
+| length | u16 | payload length |
+| payload | bytes | a record body, encoded exactly as in `.bin` |
+
+So deltas carry **whole records, not byte patches**, and the payload is read
+with the ordinary record decoder. The suffix identifies the dataset: `U00` Vin,
+`U03` MGroup, `U04` SGroup, `U05` BGroup, `U06` OInfo, `U07` Opc, `U09` Desc,
+`U10` catalog, `U11` pnc, `U12` PBook, `U16` rep, `U19` PREF.
+
+The `u32` is easy to mistake for a file header -- it is per record, and reading
+it once at the front makes the first record parse and everything after it fail.
+`PNC.U11` is the clearest specimen: 36 bytes, exactly two 18-byte operations
+adding PNCs `98127` and `98128`, both at offset 370058.
+
+```sh
+python3 re/tools/delta.py <tree>/M60/UPDATE/Temp/Daten/*.U[0-9][0-9]
+```
+
+All 19 deltas left in a real installation's `UPDATE/Temp/Daten`, and all 10
+carried by update 056, frame exactly.
 
 ## Reading a vehicle
 

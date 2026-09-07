@@ -49,6 +49,28 @@ before being caught:
 - **Filename templates are padded with stale bytes, not zeros.** `catalog.fdt`
   holds `"@.bin\0"` followed by `"g.bin\0"` left over from a longer name. Cut at
   the first NUL.
+- **The `u32` in a `.U<nn>` delta is per record, not a file header.** Reading it
+  once at the front makes the first operation parse and every later one fail on
+  a bogus opcode -- which reads like an unknown format rather than an off-by-4.
+
+## Illustrations are not TIFFs
+
+They are named `*.tif` and they are TIFFs *after* XOR-ing with `0x0b` -- except
+byte 0, which uses `0x31`. Two ways to lose a lot of time here:
+
+- **XOR `0x0b` alone gives `73 49 2a 00`**, one byte off `II*\0`. "Nearly TIFF"
+  is more misleading than "not TIFF at all"; it invites a hunt for a container
+  format wrapping a TIFF.
+- **The statistics say "compressed, not obfuscated".** The payload is CCITT
+  Group 4, so entropy is 7.59 bits/byte, all 256 byte values occur, and
+  index-of-coincidence is flat at every period from 1 to 64. Every measurement
+  says "this is a compression format" and every one of them is a true statement
+  about the *plaintext*. Do not let it rule out a cipher on top.
+
+`docs/data-format.md` asserted these were plain TIFFs for one commit. The check
+that caught it was running `file`-equivalent logic on the bytes rather than
+trusting the extension, which is the general lesson: **verify the container, not
+the name.**
 
 ## Measure, do not estimate
 

@@ -9,7 +9,9 @@ Renault/Dacia's Dialogys.
 
 ## Status
 
-The container format is fully decoded and the schema is understood end to end.
+The container format, the schema, the illustrations and the update packages are
+all decoded. One thing is open: the checksum `DeltaUpd.exe` uses to validate a
+file before patching it (see [`docs/media.md`](docs/media.md)).
 
 ```
 $ python3 re/tools/verify.py <media>/M60
@@ -19,6 +21,10 @@ $ python3 re/tools/verify.py <media>/M60
 That is every record of every dataset on the original media, each one checked
 to consume exactly its declared payload length. A fully updated installation
 (`EPC/DATA2`, update level 89) also reads at 100% — 3,854,258 records.
+
+Every one of the 18,760 parts drawings decodes to a valid CCITT Group 4 TIFF.
+They are stored as `*.tif` but are **not** TIFFs until de-obfuscated — see
+[`docs/data-format.md`](docs/data-format.md#illustrations).
 
 Joins are proven, not assumed. Walking VIN → model → group → plate → parts on
 catalogue `B6037609A` yields real, correctly described parts:
@@ -31,6 +37,9 @@ PNC      PartNumber   Qty  from      to        description
 05145    MB408473     01   1983011   1987053   GAUGE UNIT,FUEL TANK
 05152    MB129895     01   1983011   1991061   FILTER,FUEL IN TANK
 ```
+
+The drawing for that plate, `113_0103KC1A0T.tif`, carries exactly those callout
+numbers — an independent check on both the joins and the image decode.
 
 ## Read this next
 
@@ -56,9 +65,13 @@ September 2008.
 ## Tools
 
 ```
-re/tools/lexdb.py    the reader: .ddm/.fdt/.bin/.pnt
-re/tools/verify.py   decode everything and check every record's length
-re/tools/stage.sh    copy the PE binaries worth decompiling into re/bin/
+re/tools/lexdb.py     the reader: .ddm/.fdt/.bin/.pnt
+re/tools/verify.py    decode everything and check every record's length
+re/tools/illust.py    de-obfuscate the parts drawings
+re/tools/deillust.py  convert or validate an ILLUST tree
+re/tools/unwise.py    extract the payloads from an asacm60e*.exe update
+re/tools/delta.py     parse the .U<nn> record deltas
+re/tools/stage.sh     copy the PE binaries worth decompiling into re/bin/
 ```
 
 ```sh
@@ -69,6 +82,10 @@ python3 re/tools/verify.py out/M60
 
 # print the schema of every dataset
 python3 re/tools/verify.py out/M60 --schema
+
+# the drawings are XOR-obfuscated TIFFs -- check and convert them
+python3 re/tools/deillust.py --check out/M60/ILLUST
+python3 re/tools/deillust.py --all out/M60/ILLUST tiffs/
 ```
 
 ## Licence and intent

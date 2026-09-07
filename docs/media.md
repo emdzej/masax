@@ -70,9 +70,17 @@ updated copy**. Catalogue revisions bump their second-to-last character:
 `B603D507A` → `B603D508A` and `B603N608A` → `B603N609A`.
 
 A bundle built from the ISOs alone is complete and internally consistent — it
-is simply the September 2008 release rather than update level 89. The delta
-`.exe` files are self-extracting and have not been unpacked here; doing so is
-the open task if you want the patched data without a Windows install.
+is simply the September 2008 release rather than update level 89.
+
+The update packages **are** unpacked now — they are Wise Installer
+self-extractors, and `re/tools/unwise.py` recovers their payloads. Each carries
+a plain-text recipe for `DeltaUpd.exe` plus `.U<nn>` record deltas, both
+documented in [`data-format.md`](data-format.md#delta-updates). What is still
+missing is the checksum algorithm the recipe uses to validate a target before
+patching: it is not CRC32 in any orientation, so an applier could run but could
+not verify its output. Note also that none of the 34 updates' published
+checksums correspond to the media files under any common algorithm, so the
+media's exact update level is not yet established.
 
 Record counts, media versus the updated dump:
 
