@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 import { Command, Option } from "@commander-js/extra-typings";
-import { verify } from "./verify.js";
+import type { Language } from "@masax/core";
 import { checkIllustrations, convertIllustrations, showIllustration } from "./illust.js";
+import { decodeVin, show } from "./show.js";
+import { verify } from "./verify.js";
+
+const generation = () =>
+  new Option("-g, --generation <n>", "which data generation to read")
+    .choices(["1", "2"] as const)
+    .default("1" as const);
 
 const program = new Command()
   .name("masax")
@@ -10,24 +17,47 @@ const program = new Command()
 
 program
   .command("verify")
-  .description("decode every record of every dataset and check its declared length")
+  .description("decode every record of every dataset and check the format invariants")
   .argument("<root>", "an ASA module directory, e.g. /mnt/asa/M60")
-  .addOption(
-    new Option("-g, --generation <n>", "which data generation to read")
-      .choices(["1", "2"])
-      .default("1"),
-  )
+  .addOption(generation())
   .option("--schema", "print each dataset's schema as it is opened", false)
   .option("--only <dataset>", "verify a single dataset by name")
   .option("--run-keys", "print the run key derived from the data instead of checking it", false)
   .action(async (root, options) => {
-    const code = await verify(root, {
+    process.exitCode = await verify(root, {
       generation: options.generation === "2" ? 2 : 1,
       schema: options.schema,
       only: options.only,
       runKeys: options.runKeys,
     });
-    process.exitCode = code;
+  });
+
+program
+  .command("show")
+  .description("walk catalogue, model, main group, plate and its parts")
+  .argument("<root>", "an ASA module directory")
+  .argument("[path...]", "catalogue id, then model, main group, subgroup")
+  .addOption(generation())
+  .option("-l, --language <code>", "language for resolved text", "GB")
+  .action(async (root, path, options) => {
+    process.exitCode = await show(root, path, {
+      generation: options.generation === "2" ? 2 : 1,
+      language: options.language as Language,
+    });
+  });
+
+program
+  .command("vin")
+  .description("decode a VIN against the catalogue's own vehicle data")
+  .argument("<root>", "an ASA module directory")
+  .argument("<vin>", "a 17-character VIN")
+  .addOption(generation())
+  .option("-l, --language <code>", "language for resolved text", "GB")
+  .action(async (root, vin, options) => {
+    process.exitCode = await decodeVin(root, vin, {
+      generation: options.generation === "2" ? 2 : 1,
+      language: options.language as Language,
+    });
   });
 
 program

@@ -57,6 +57,18 @@ export function decodeAsaDate(value: AsaDate | undefined): ProductionDate | unde
   return { year, month, third: third as 1 | 2 | 3 };
 }
 
+/**
+ * Compact form for tables: `1983-01·1`, with the third as a digit.
+ *
+ * The drawings themselves print dates this way — a plate carries `(-8301·3)` —
+ * so the notation is the vendor's, not an invention.
+ */
+export function formatAsaDateShort(value: AsaDate | undefined): string {
+  const d = decodeAsaDate(value);
+  if (!d) return "";
+  return `${d.year}-${String(d.month).padStart(2, "0")}\u00b7${d.third}`;
+}
+
 /** Format a production date as `1983-01` plus the third, e.g. `1983-01 (early)`. */
 export function formatAsaDate(value: AsaDate | undefined): string {
   const d = decodeAsaDate(value);

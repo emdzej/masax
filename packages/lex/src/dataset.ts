@@ -241,6 +241,49 @@ export class Dataset {
     }
   }
 
+  /**
+   * Every record of the run that index entry `i` points at.
+   *
+   * Index offsets are monotonic, so a run ends where the next entry begins.
+   * That makes a run a single bounded range read rather than a scan of the
+   * file: 186 bytes on average for `Vin`, 18 KB at worst. This is the path the
+   * browser uses — `A/VIN.BIN` is 76 MB and is never downloaded.
+   *
+   * `inherit` is applied within the run, seeded from its first record, which is
+   * self-sufficient by definition of a run start.
+   */
+  async readRun(i: number, inherit: readonly string[] = []): Promise<LexRecord[]> {
+    if (i < 0 || i >= this.index.count) return [];
+    const from = this.index.offsetAt(i);
+    const to = i + 1 < this.index.count ? this.index.offsetAt(i + 1) : await this.bin.size();
+    const window = await this.bin.read(from, to - from);
+
+    const out: LexRecord[] = [];
+    const carry: LexRecord = {};
+    let at = 0;
+    while (at + 2 <= window.length) {
+      const length = window[at]! | (window[at + 1]! << 8);
+      if (length === 0) break;
+      const { record, used } = decodeRecord(window.subarray(at + 2, at + 2 + length), this.fdt);
+      if (used !== length) {
+        throw new Error(`${this.name} run ${i}: fields consumed ${used} of ${length} bytes`);
+      }
+      for (const code of inherit) {
+        const value = record[code];
+        if (value !== undefined) carry[code] = value;
+        else if (carry[code] !== undefined) record[code] = carry[code]!;
+      }
+      out.push(record);
+      at += 2 + length;
+    }
+    return out;
+  }
+
+  /** The run for `key`, or an empty array when the key is not indexed. */
+  async runFor(key: PntKey, inherit: readonly string[] = []): Promise<LexRecord[]> {
+    return this.readRun(this.index.find(key), inherit);
+  }
+
   /** Byte offsets of every record, for checking the index lands on boundaries. */
   async recordOffsets(): Promise<Set<number>> {
     const whole = await this.whole();

@@ -21,5 +21,8 @@
   "dependencies": {
     "@masax/core": "workspace:*",
     "@masax/lex": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1"
   }
 }
