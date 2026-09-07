@@ -8,9 +8,12 @@
 -->
 <script lang="ts">
   import { bitmapToRgba, decodeIllustration } from "@masax/illust";
-  import type { Source } from "@masax/lex";
+  import type { AsaCatalogue } from "@masax/catalogue";
 
-  let { source, name }: { source: Source | undefined; name: string | undefined } = $props();
+  let {
+    catalogue,
+    name,
+  }: { catalogue: AsaCatalogue | undefined; name: string | undefined } = $props();
 
   let canvas = $state<HTMLCanvasElement | undefined>(undefined);
   let problem = $state("");
@@ -19,18 +22,16 @@
   $effect(() => {
     const element = canvas;
     const drawing = name;
-    if (!source || !drawing || !element) return;
+    if (!catalogue || !drawing || !element) return;
 
     let cancelled = false;
     problem = "";
     size = "";
 
-    // The first three characters of the name are the subdirectory. `1@_` is a
-    // literal directory, not a placeholder.
-    const path = `ILLUST/${drawing.slice(0, 3)}/${drawing}.tif`;
     void (async () => {
       try {
-        const stored = await source.readFile(path);
+        const stored = await catalogue.readIllustration(drawing);
+        if (!stored) throw new Error("drawing not found");
         if (cancelled) return;
         const image = decodeIllustration(stored);
         const context = element.getContext("2d");
@@ -44,7 +45,7 @@
         );
         size = `${image.width}×${image.height}`;
       } catch (cause) {
-        if (!cancelled) problem = `${path}: ${(cause as Error).message}`;
+        if (!cancelled) problem = `${drawing}: ${(cause as Error).message}`;
       }
     })();
 

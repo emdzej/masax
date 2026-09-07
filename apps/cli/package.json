@@ -15,12 +15,16 @@
   },
   "dependencies": {
     "@commander-js/extra-typings": "^15.0.0",
+    "@emdzej/csfs-core": "^0.1.0",
+    "@emdzej/csfs-manifest": "^0.1.0",
+    "@emdzej/csfs-node": "^0.1.0",
     "@masax/catalogue": "workspace:*",
     "@masax/core": "workspace:*",
+    "@masax/illust": "workspace:*",
     "@masax/lex": "workspace:*",
     "chalk": "^6.0.0",
     "commander": "^15.0.0",
-    "@masax/illust": "workspace:*"
+    "@masax/importer": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.13.1"

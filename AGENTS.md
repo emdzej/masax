@@ -94,6 +94,24 @@ Prove that direction rather than assuming it: update 089's `PNC.U11` adds PNCs
 side of the patch its checksum represents. Both readings are self-consistent
 against the checksums alone.
 
+## Case, across sources
+
+Disc A spells the drawings directory `Illust`; disc B spells it `ILLUST`. An
+ISO 9660 mount is **case-sensitive**, and so is the HTTP backend. Two things
+followed from that, both caught only by counting:
+
+- An overlay that matched names exactly asked disc B for `Illust`, got nothing,
+  and imported **9,402 of the 17,977** drawings while reporting success. The
+  overlay now resolves each path segment ignoring case, and `masax import` is
+  checked against the union of both discs' paths.
+- The client asked for `ILLUST/...` over HTTP against a tree that had `Illust/`,
+  so every drawing 404'd. Drawing paths are resolved through
+  `AsaCatalogue.readIllustration`, which finds the real directory name once.
+
+The lesson generalises: **a filesystem's case rules are a property of that
+filesystem**, and this project reads four kinds. Never hand a whole path to a
+layer and assume it matches the way the previous layer did.
+
 ## Illustrations are not TIFFs
 
 They are named `*.tif` and they are TIFFs _after_ XOR-ing with `0x0b` -- except

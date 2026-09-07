@@ -1,8 +1,8 @@
 {
-  "name": "@masax/catalogue",
+  "name": "@masax/importer",
   "version": "0.1.0",
   "private": true,
-  "description": "ASA domain: catalogues, groups, plates, parts, VIN decoding, supersession",
+  "description": "Recognise mounted ASA discs, read several as one tree, and copy them into one",
   "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "main": "dist/index.js",
@@ -19,11 +19,6 @@
     "clean": "rm -rf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
-    "@emdzej/csfs-core": "^0.1.0",
-    "@masax/core": "workspace:*",
-    "@masax/lex": "workspace:*"
-  },
-  "devDependencies": {
-    "@types/node": "^22.13.1"
+    "@emdzej/csfs-core": "^0.1.0"
   }
 }

@@ -83,11 +83,11 @@ export async function serve(root: string, options: ServeOptions): Promise<number
     console.error(chalk.red(`${dataDir}: no such directory`));
     return 1;
   }
-  if (!existsSync(join(dataDir, "manifest.json"))) {
+  if (!existsSync(join(dataDir, "csfs-manifest.json"))) {
     console.error(
       chalk.yellow(
-        `${dataDir}/manifest.json is missing. HTTP cannot list a directory, so the\n` +
-          `client needs one. Generate it with:  masax manifest ${root} -o ${root}/manifest.json`,
+        `${dataDir}/csfs-manifest.json is missing. HTTP cannot list a directory,\n` +
+          `so the client needs one. It is written by:  masax import … -o ${root}`,
       ),
     );
   }

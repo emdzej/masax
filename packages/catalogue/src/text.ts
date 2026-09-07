@@ -7,7 +7,8 @@
  * language switch is a different `Desc` file and nothing else.
  */
 import type { Language, Pnc, Ts } from "@masax/core";
-import { Dataset, type Source } from "@masax/lex";
+import type { CsFileSystem } from "@emdzej/csfs-core";
+import { Dataset } from "@masax/lex";
 
 export class TextTable {
   private constructor(
@@ -22,8 +23,8 @@ export class TextTable {
    * `Desc` is 48,549 rows and about 1.3 MB, and `pnc` 28,313 rows and 368 kB,
    * so both are read in full and held. Everything else is looked up by range.
    */
-  static async open(source: Source, dir: string, language: Language): Promise<TextTable> {
-    const desc = await Dataset.open(source, dir, "Desc", language);
+  static async open(fs: CsFileSystem, dir: string, language: Language): Promise<TextTable> {
+    const desc = await Dataset.open(fs, dir, "Desc", language);
     const strings = new Map<number, string>();
     for await (const { record } of desc.scan()) {
       const ts = record["A0"];
@@ -32,7 +33,7 @@ export class TextTable {
     }
     await desc.close();
 
-    const pnc = await Dataset.open(source, dir, "pnc");
+    const pnc = await Dataset.open(fs, dir, "pnc");
     const pncTs = new Map<string, number>();
     for await (const { record } of pnc.scan()) {
       const code = record["A0"];

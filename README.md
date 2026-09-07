@@ -53,20 +53,49 @@ applicability is.
 The drawing for that plate, `113_0103KC1A0T.tif`, carries exactly those callout
 numbers — an independent check on both the joins and the image decode.
 
-## The app
+## Getting the data in
 
-A Svelte 5 client, 30 kB gzipped, no backend. Point it at a mounted disc or a
-static tree and it goes catalogue → model → group → plate: the drawing painted
-to a canvas beside the parts table, with VIN decoding and four languages.
+**Mount the ISOs and point masax at the mount points.** Nothing is extracted,
+nothing is converted, and the catalogue is read where it lies.
 
 ```sh
-pnpm dev                                  # then open a folder in the browser
-masax manifest <media>/M60 -o <media>/M60/manifest.json   # to serve over HTTP
+hdiutil attach -readonly MMC_ASA_EUR_A.iso     # macOS → /Volumes/MMC-A
+hdiutil attach -readonly MMC_ASA_EUR_B.iso     #       → /Volumes/MMC ASA 2
+
+masax survey /Volumes/MMC-A "/Volumes/MMC ASA 2"
+masax verify /Volumes/MMC-A "/Volumes/MMC ASA 2"    # 9,495,097 records
+```
+
+Neither disc is complete — disc A carries 30 of the 52 catalogues and one half
+of the vehicle index, disc B the rest — so the mount points are _overlaid_
+rather than chosen between. `masax import` copies that overlay into one tree,
+byte-for-byte, when you want a single thing to host or keep:
+
+```sh
+masax import /Volumes/MMC-A "/Volumes/MMC ASA 2" -o data/M60
+```
+
+## The app
+
+A Svelte 5 client, 34 kB gzipped, no backend. Choosing a folder is the primary
+path: `File.slice()` is a range read, so a mounted disc is read in place and a
+76 MB `VIN.BIN` never leaves it. Add both discs and they are overlaid the same
+way the CLI does it. HTTP is the fallback, for a hosted tree and for browsers
+without the File System Access API; OPFS keeps a copy for offline use.
+
+```sh
+pnpm dev                                     # then choose a folder
+masax serve data/M60 --app apps/web/dist     # or host an imported tree
 ```
 
 The drawings are Group 4 TIFFs behind a byte obfuscation, so they are decoded in
 the browser rather than converted first — which is what lets the app read a disc
 directly and a static host serve the vendor's own files unchanged.
+
+The read boundary is [`csfs`](https://www.npmjs.com/package/@emdzej/csfs-core):
+a `CsFile` is `Blob`-shaped, so `slice(pos, pos + len).bytes()` is exactly the
+record read this format needs, over a picked directory, OPFS, HTTP `Range` or
+`node:fs` without changing a line of the engine.
 
 Four browser tests walk the whole chain over HTTP `Range`, including that the
 canvas is actually painted rather than left blank.
@@ -104,10 +133,6 @@ September 2008.
 
 ```sh
 pnpm install && pnpm build
-
-# extract the original media
-unzip -p ASA_EUROPE.zip MMC_ASA_EUR_A.iso | bsdtar -xf - -C out/
-unzip -p ASA_EUROPE.zip MMC_ASA_EUR_B.iso | bsdtar -xf - -C out/
 
 masax verify out/M60                 # every record, every invariant
 masax verify out/M60 --schema        # print each dataset's schema

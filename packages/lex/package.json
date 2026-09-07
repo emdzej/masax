@@ -11,10 +11,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    },
-    "./node": {
-      "types": "./dist/node.d.ts",
-      "default": "./dist/node.js"
     }
   },
   "scripts": {
@@ -23,6 +19,7 @@
     "clean": "rm -rf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
+    "@emdzej/csfs-core": "^0.1.0",
     "@masax/core": "workspace:*"
   },
   "devDependencies": {

@@ -9,19 +9,18 @@ Read [`data-format.md`](data-format.md) first — the plan follows from the form
 
 ASA addresses every record as an **offset in a `.bin`, taken from a sorted
 `.pnt` index**. A record read is "two bytes at `offset` for the length, then
-that many bytes", which is byte-for-byte the shape of an HTTP `Range` request
-and of `File.slice()` in a browser.
+that many bytes", which is byte-for-byte the shape of `Blob.slice()` and of an
+HTTP `Range` request.
 
-So the reader interface is one method:
+That is exactly the contract **[`csfs`](https://www.npmjs.com/package/@emdzej/csfs-core)**
+provides: a `CsFile` is `Blob`-shaped, so `file.slice(pos, pos + len).bytes()`
+_is_ the record read, and it works unchanged over a picked directory
+(`csfs-fsa`), the origin private filesystem (`csfs-opfs`), static HTTP with
+`Range` (`csfs-http`) and `node:fs` (`csfs-node`). masax uses it rather than its
+own read boundary — an earlier version had one, and it was the same interface
+with fewer backends and no case-insensitive lookup.
 
-```ts
-read(pos: number, len: number): Promise<Uint8Array>
-```
-
-with backends for HTTP `Range`, a picked directory, an in-memory buffer, and
-`fs.read()` in the CLI. **The same engine runs over all of them**, and the
-consequence is that **the data does not need converting** — a static host can
-serve the vendor's own files.
+**The data does not need converting.** A mounted disc is read where it lies.
 
 Better still, the index is _monotonic_: entry `i`'s run ends where entry `i+1`
 begins. A run is therefore one bounded read, averaging 186 bytes for `Vin`. A
@@ -51,6 +50,26 @@ inventing one, and 4 MB is the typical case.
 
 **Verdict: purely client-side, no backend.** Built and running.
 
+### Getting the data in
+
+The expected flow is: **mount the ISOs and point masax at the mount points.**
+Nothing is extracted and nothing is converted.
+
+Two things make that work. First, neither disc is complete — disc A carries 30
+of the 52 catalogues and the `DATA1/A` index half, disc B the other 22 and
+`DATA1/B`, and both write into the same `EPC/DATA1` — so the mount points are
+**overlaid** rather than chosen between. Second, a mount point is not a module
+root: the volume contains `M60/`, so it is surveyed and scoped.
+
+The discs are not self-describing and their volume names are no guide — disc A
+mounts as `MMC-A` and disc B as `MMC ASA 2` — so `survey` identifies them by
+what is inside.
+
+`masax import` copies the overlay into one tree, byte-for-byte, and writes a
+`csfs-manifest.json` so it can be hosted. That is for when you _want_ a single
+tree, not something you must do first. In the browser the same overlay runs over
+picked directories, and `csfs-opfs` can hold a copy for offline use.
+
 Unlike the Renault equivalent, **VIN decoding works locally**: `Vin` holds 5.4 M
 records across the two halves, and identification is a lookup rather than an
 algorithm.
@@ -65,10 +84,10 @@ apps/
   cli        verify the format, walk the data, decode VINs and drawings
 packages/
   core       shared vocabulary and the YYYYMMT date
-  lex        the storage engine: .ddm/.fdt, the .pnt index, .bin records, Reader
+  lex        the storage engine: .ddm/.fdt, the .pnt index, .bin records
   illust     the drawings: de-obfuscation and a CCITT Group 4 decoder
   catalogue  the domain: catalogues, groups, plates, parts, VIN, text
-  importer   disc classification and merge                        (not built)
+  importer   recognise mounted discs, overlay them, copy one out
   search     part-number and label search over derived indexes    (not built)
 docs/
 ```
@@ -128,10 +147,13 @@ vehicle whose correct parts list is known from outside this data.
 `PBook` are fully indexed) but is not in the interface. Part-name search wants
 the `DudMMC` word index. Both need a derived index to be quick over HTTP.
 
-**Phase 7 — import and offline.** `masax manifest` describes a static tree
-today. A disc importer (merging the two ISOs, which are known to merge without
-conflict) and an OPFS backend for genuine offline use are the natural next
-steps; the `Source` interface already makes them backends rather than redesigns.
+**Phase 7 — ingestion and offline. Done.** `masax survey` says what a mount
+point holds, `masax import` merges mount points into one tree and writes a
+manifest, and every other command reads the mounts in place. The browser does
+the same over picked directories and can keep a copy in OPFS.
+
+Measured: `masax verify /Volumes/MMC-A "/Volumes/MMC ASA 2"` reads all
+9,495,097 records straight off the two mounted ISOs.
 
 ## 5. Ranked risks
 
@@ -148,7 +170,13 @@ steps; the `Source` interface already makes them backends rather than redesigns.
 4. **File System Access API support.** Chrome and Edge only. Firefox and Safari
    users need the HTTP path, and the interface says so rather than failing
    obscurely.
-5. **Licensing and redistribution.** The data is Mitsubishi's. `data/` is
+5. **Case, across layers.** Already bitten: disc A spells the drawings directory
+   `Illust` and disc B spells it `ILLUST`, and an ISO 9660 mount is
+   case-sensitive. An overlay that matched exactly imported 9,402 of the 17,977
+   drawings and reported success. The overlay now resolves each path segment
+   ignoring case, and the importer's count is checked against the union of both
+   discs.
+6. **Licensing and redistribution.** The data is Mitsubishi's. `data/` is
    git-ignored, so are `re/bin/` and any extracted tree, and the app ships
    without data.
 

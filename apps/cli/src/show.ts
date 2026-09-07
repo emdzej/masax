@@ -9,7 +9,7 @@ import chalk from "chalk";
 import { AsaCatalogue, VinNotWellFormed, type PartRow } from "@masax/catalogue";
 import type { Language } from "@masax/core";
 import { formatAsaDate, formatAsaDateShort } from "@masax/core";
-import { NodeSource } from "@masax/lex/node";
+import type { CsFileSystem } from "@emdzej/csfs-core";
 
 export interface ShowOptions {
   generation: 1 | 2;
@@ -22,8 +22,12 @@ const dateRange = (row: { startDate?: number; endDate?: number }) => {
   return from || to ? `${from || "?"} - ${to || "?"}` : "";
 };
 
-export async function show(root: string, path: string[], options: ShowOptions): Promise<number> {
-  const catalogue = await AsaCatalogue.open(new NodeSource(root), options);
+export async function show(
+  fs: CsFileSystem,
+  path: string[],
+  options: ShowOptions,
+): Promise<number> {
+  const catalogue = await AsaCatalogue.open(fs, options);
   const [id, model, mainGroupText, subGroupText] = path;
 
   if (!id) {
@@ -120,8 +124,12 @@ function formatPart(row: PartRow): string {
   );
 }
 
-export async function decodeVin(root: string, vin: string, options: ShowOptions): Promise<number> {
-  const catalogue = await AsaCatalogue.open(new NodeSource(root), options);
+export async function decodeVin(
+  fs: CsFileSystem,
+  vin: string,
+  options: ShowOptions,
+): Promise<number> {
+  const catalogue = await AsaCatalogue.open(fs, options);
   try {
     const result = await catalogue.vin.decode(vin);
     console.log(

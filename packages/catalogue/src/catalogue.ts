@@ -13,7 +13,8 @@
  * VIN halves, reached by bounded run reads instead.
  */
 import type { AsaDate, CatalogueId, Language, Pnc, PartNumber } from "@masax/core";
-import { Dataset, type LexRecord, type Source } from "@masax/lex";
+import type { CsFileSystem } from "@emdzej/csfs-core";
+import { Dataset, listDirectory, type LexRecord } from "@masax/lex";
 import { TextTable } from "./text.js";
 import { VinIndex } from "./vin.js";
 import { CATALOGUE_DATASETS } from "./datasets.js";
@@ -96,7 +97,7 @@ export class AsaCatalogue {
   private readonly partsCache = new Map<CatalogueId, PartRow[]>();
 
   private constructor(
-    private readonly source: Source,
+    private readonly fs: CsFileSystem,
     readonly dataDir: string,
     readonly text: TextTable,
     readonly vin: VinIndex,
@@ -106,14 +107,14 @@ export class AsaCatalogue {
     private readonly plates: LexRecord[],
   ) {}
 
-  static async open(source: Source, options: OpenOptions = {}): Promise<AsaCatalogue> {
+  static async open(fs: CsFileSystem, options: OpenOptions = {}): Promise<AsaCatalogue> {
     const dataDir = `EPC/DATA${options.generation ?? 1}`;
     const language = options.language ?? "GB";
 
-    const textTable = await TextTable.open(source, dataDir, language);
-    const vin = await VinIndex.open(source, dataDir);
+    const textTable = await TextTable.open(fs, dataDir, language);
+    const vin = await VinIndex.open(fs, dataDir);
 
-    const cinfo = await Dataset.open(source, dataDir, "CInfo");
+    const cinfo = await Dataset.open(fs, dataDir, "CInfo");
     const info: CatalogueInfo[] = [];
     for await (const { record } of cinfo.scan(runKeyOf("CInfo"))) {
       const id = text(record, "A0");
@@ -131,7 +132,7 @@ export class AsaCatalogue {
     await cinfo.close();
 
     const load = async (name: string) => {
-      const dataset = await Dataset.open(source, dataDir, name);
+      const dataset = await Dataset.open(fs, dataDir, name);
       const rows: LexRecord[] = [];
       for await (const { record } of dataset.scan(runKeyOf(name))) rows.push(record);
       await dataset.close();
@@ -139,7 +140,7 @@ export class AsaCatalogue {
     };
 
     return new AsaCatalogue(
-      source,
+      fs,
       dataDir,
       textTable,
       vin,
@@ -242,7 +243,7 @@ export class AsaCatalogue {
     const cached = this.partsCache.get(id);
     if (cached) return cached;
 
-    const dataset = await Dataset.open(this.source, this.dataDir, "catalog", id);
+    const dataset = await Dataset.open(this.fs, this.dataDir, "catalog", id);
     const rows: PartRow[] = [];
     for await (const { record } of dataset.scan(runKeyOf("catalog"))) {
       const pnc = text(record, "A1");
@@ -287,6 +288,40 @@ export class AsaCatalogue {
     return table.filter(
       (row) => row.model === model && row.mainGroup === mainGroup && row.subGroup === subGroup,
     );
+  }
+
+  /**
+   * Read a drawing by its `Illustration` name.
+   *
+   * The name is the file's basename and its first three characters are the
+   * subdirectory — `113_0103KC1A0T` lives in `113`, and `1@_____300164T` in
+   * `1@_`, where the `@` is a literal directory name and not a placeholder.
+   *
+   * The directory that holds them is spelled `Illust` on one disc and `ILLUST`
+   * on the other, and an imported tree keeps whichever disc was read first. So
+   * the name is resolved against a listing rather than assumed — the HTTP
+   * backend is case-sensitive, and guessing wrong means every drawing 404s.
+   */
+  async readIllustration(name: string): Promise<Uint8Array | undefined> {
+    if (!name) return undefined;
+    this.illustDir ??= await this.findIllustDir();
+    if (this.illustDir === "") return undefined;
+    const bucket = name.slice(0, 3);
+    for (const entry of await listDirectory(this.fs, `${this.illustDir}/${bucket}`)) {
+      if (entry.toLowerCase() === `${name.toLowerCase()}.tif`) {
+        return (await this.fs.read(`${this.illustDir}/${bucket}/${entry}`)) ?? undefined;
+      }
+    }
+    return undefined;
+  }
+
+  private illustDir?: string;
+
+  private async findIllustDir(): Promise<string> {
+    for (const entry of await listDirectory(this.fs, "")) {
+      if (entry.toLowerCase() === "illust") return entry;
+    }
+    return "";
   }
 
   /** Every part in a catalogue whose part number matches, for search. */

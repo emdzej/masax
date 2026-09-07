@@ -13,8 +13,8 @@ import {
   type PartRow,
   type VinRecord,
 } from "@masax/catalogue";
+import type { CsFileSystem } from "@emdzej/csfs-core";
 import type { Language } from "@masax/core";
-import type { Source } from "@masax/lex";
 
 export const LANGUAGES: { code: Language; label: string }[] = [
   { code: "GB", label: "English" },
@@ -24,7 +24,7 @@ export const LANGUAGES: { code: Language; label: string }[] = [
 ];
 
 export class AppState {
-  source = $state<Source | undefined>(undefined);
+  fs = $state<CsFileSystem | undefined>(undefined);
   catalogue = $state<AsaCatalogue | undefined>(undefined);
   language = $state<Language>("GB");
 
@@ -48,13 +48,13 @@ export class AppState {
   );
 
   /** Open a data tree and load the navigation tables. */
-  async openSource(source: Source, describe: string): Promise<void> {
+  async openSource(fs: CsFileSystem, describe: string): Promise<void> {
     this.busy = true;
     this.error = "";
     this.status = `Opening ${describe}…`;
     try {
-      const catalogue = await AsaCatalogue.open(source, { language: this.language });
-      this.source = source;
+      const catalogue = await AsaCatalogue.open(fs, { language: this.language });
+      this.fs = fs;
       this.catalogue = catalogue;
       this.catalogues = catalogue.catalogues();
       this.status = `${this.catalogues.length} catalogues, ${catalogue.vin.records.toLocaleString()} indexed vehicles`;
@@ -70,12 +70,12 @@ export class AppState {
   /** Reload text in a different language, keeping the current selection. */
   async setLanguage(language: Language): Promise<void> {
     this.language = language;
-    if (!this.source) return;
+    if (!this.fs) return;
     const catalogue = this.selectedCatalogue;
     const model = this.selectedModel;
     const mainGroup = this.selectedMainGroup;
     const plate = this.selectedPlate?.subGroup;
-    await this.openSource(this.source, "the catalogue");
+    await this.openSource(this.fs, "the catalogue");
     if (catalogue) {
       await this.selectCatalogue(catalogue);
       if (model) {

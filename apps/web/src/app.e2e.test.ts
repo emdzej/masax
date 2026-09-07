@@ -94,8 +94,12 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
       }
     });
     await page.goto(base);
+    // The picked-directory path is the primary one and needs a real user
+    // gesture against a real folder, so the browser test drives the HTTP
+    // fallback. It lives behind a disclosure, which has to be opened first.
+    await page.getByText("or a tree hosted over HTTP").click();
     await page.getByPlaceholder(/example\.org/).fill(`${base}/data/M60/`);
-    await page.getByRole("button", { name: "Open" }).click();
+    await page.getByRole("button", { name: "Open", exact: true }).click();
     try {
       await page.locator("select[size]").waitFor({ timeout: 90_000 });
     } catch (cause) {

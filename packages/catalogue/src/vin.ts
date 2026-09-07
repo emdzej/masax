@@ -20,7 +20,8 @@
  * records in it. One serial can carry many chassis variants; `A000001` has 66.
  */
 import { type AsaDate, type VinHalf, decodeAsaDate, type ProductionDate } from "@masax/core";
-import { Dataset, type LexRecord, type Source } from "@masax/lex";
+import type { CsFileSystem } from "@emdzej/csfs-core";
+import { Dataset, type LexRecord } from "@masax/lex";
 
 export const VIN_LENGTH = 17;
 export const SERIAL_LENGTH = 7;
@@ -114,11 +115,11 @@ export class VinIndex {
    * both with different vehicles behind it, so a lookup has to try each and the
    * chassis prefix is what disambiguates.
    */
-  static async open(source: Source, dataDir: string): Promise<VinIndex> {
+  static async open(fs: CsFileSystem, dataDir: string): Promise<VinIndex> {
     const halves: { half: VinHalf; dataset: Dataset }[] = [];
     for (const half of ["A", "B"] as const) {
       try {
-        halves.push({ half, dataset: await Dataset.open(source, `${dataDir}/${half}`, "Vin") });
+        halves.push({ half, dataset: await Dataset.open(fs, `${dataDir}/${half}`, "Vin") });
       } catch {
         // A partial installation may carry only one half.
       }

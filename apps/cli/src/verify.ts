@@ -17,7 +17,7 @@
  */
 import chalk from "chalk";
 import { Dataset, findVariants, parseDdm, parseFdt, resolveFile } from "@masax/lex";
-import { NodeSource } from "@masax/lex/node";
+import type { CsFileSystem } from "@emdzej/csfs-core";
 import { datasetLocations, type DatasetLocation } from "@masax/catalogue";
 
 export interface VerifyOptions {
@@ -40,8 +40,14 @@ interface Result {
  * They must not be discovered from filenames: `catalog`'s template is `@.bin`,
  * which glob-matches every `.bin` in the directory.
  */
-async function catalogueIds(source: NodeSource, dir: string): Promise<string[]> {
-  const cinfo = await Dataset.open(source, dir, "CInfo");
+async function mustRead(fs: CsFileSystem, path: string): Promise<Uint8Array> {
+  const bytes = await fs.read(path);
+  if (!bytes) throw new Error(`${path}: not found`);
+  return bytes;
+}
+
+async function catalogueIds(fs: CsFileSystem, dir: string): Promise<string[]> {
+  const cinfo = await Dataset.open(fs, dir, "CInfo");
   const ids: string[] = [];
   for await (const { record } of cinfo.indexEntries()) {
     const id = record["A0"];
@@ -52,21 +58,20 @@ async function catalogueIds(source: NodeSource, dir: string): Promise<string[]> 
 }
 
 async function variantsFor(
-  source: NodeSource,
+  fs: CsFileSystem,
   location: DatasetLocation,
   catalogues: string[],
 ): Promise<(string | undefined)[]> {
   if (location.variant === "none") return [undefined];
   if (location.variant === "catalogue") return catalogues;
-  const ddmPath = await resolveFile(source, location.dir, `${location.name}.ddm`);
-  const ddm = parseDdm(await source.readFile(ddmPath));
-  const fdtPath = await resolveFile(source, location.dir, ddm.fdt ?? `${location.name}.fdt`);
-  const fdt = parseFdt(await source.readFile(fdtPath));
-  return findVariants(source, location.dir, fdt.binTemplate);
+  const ddmPath = await resolveFile(fs, location.dir, `${location.name}.ddm`);
+  const ddm = parseDdm(await mustRead(fs, ddmPath));
+  const fdtPath = await resolveFile(fs, location.dir, ddm.fdt ?? `${location.name}.fdt`);
+  const fdt = parseFdt(await mustRead(fs, fdtPath));
+  return findVariants(fs, location.dir, fdt.binTemplate);
 }
 
-export async function verify(root: string, options: VerifyOptions): Promise<number> {
-  const source = new NodeSource(root);
+export async function verify(fs: CsFileSystem, options: VerifyOptions): Promise<number> {
   const locations = datasetLocations(options.generation).filter(
     (l) => !options.only || l.name.toLowerCase() === options.only.toLowerCase(),
   );
@@ -74,7 +79,7 @@ export async function verify(root: string, options: VerifyOptions): Promise<numb
   const dataDir = `EPC/DATA${options.generation}`;
   let catalogues: string[] = [];
   try {
-    catalogues = await catalogueIds(source, dataDir);
+    catalogues = await catalogueIds(fs, dataDir);
   } catch (error) {
     console.error(chalk.red(`cannot read ${dataDir}/CInfo: ${(error as Error).message}`));
     return 1;
@@ -85,7 +90,7 @@ export async function verify(root: string, options: VerifyOptions): Promise<numb
   for (const location of locations) {
     let variants: (string | undefined)[];
     try {
-      variants = await variantsFor(source, location, catalogues);
+      variants = await variantsFor(fs, location, catalogues);
     } catch (error) {
       if (!location.optional) {
         results.push({
@@ -106,7 +111,7 @@ export async function verify(root: string, options: VerifyOptions): Promise<numb
     for (const variant of variants) {
       let dataset: Dataset;
       try {
-        dataset = await Dataset.open(source, location.dir, location.name, variant);
+        dataset = await Dataset.open(fs, location.dir, location.name, variant);
       } catch {
         continue;
       }

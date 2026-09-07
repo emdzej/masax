@@ -20,6 +20,9 @@
     },
     {
       "path": "../../packages/illust"
+    },
+    {
+      "path": "../../packages/importer"
     }
   ]
 }

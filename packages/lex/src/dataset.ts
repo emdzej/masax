@@ -1,16 +1,22 @@
 /**
  * A dataset — one `.ddm`/`.fdt`/`.bin`/`.pnt` quadruple.
  *
+ * The read boundary is `@emdzej/csfs`: a `CsFile` is `Blob`-shaped, so
+ * `file.slice(pos, pos + len).bytes()` is exactly the "record at an offset"
+ * read this format needs, and it works the same over a picked directory, a
+ * mounted disc, OPFS, and static HTTP with `Range`. That is why nothing here
+ * knows where its bytes come from.
+ *
  * The `.bin` and `.pnt` names come from the `.fdt`, not from the `.ddm`'s own
- * name, and they may contain a `@` standing for a language code or a catalogue
- * id. Filenames also mix case freely: `PNC.BIN` sits beside `pnc.pnt`, so every
- * lookup resolves case-insensitively.
+ * name, and may contain a `@` standing for a language code or a catalogue id.
+ * Filenames also mix case freely — `PNC.BIN` sits beside `pnc.pnt` — so every
+ * lookup resolves case-insensitively against a listing.
  */
+import type { CsFile, CsFileSystem } from "@emdzej/csfs-core";
 import { parseDdm, type Ddm, type DdmField } from "./ddm.js";
 import { parseFdt, type Fdt, type Field } from "./fdt.js";
 import { PntIndex, type PntKey } from "./pnt.js";
 import { decodeRecord, type LexRecord } from "./record.js";
-import type { Reader, Source } from "./reader.js";
 
 /** A field with the `.ddm` comment folded in — the name worth showing a user. */
 export interface NamedField extends Field {
@@ -35,25 +41,33 @@ export interface ScanEntry {
 
 const joinPath = (dir: string, name: string) => (dir ? `${dir}/${name}` : name);
 
+/** Names directly inside `dir`. Empty when the directory is absent. */
+export async function listDirectory(fs: CsFileSystem, dir: string): Promise<string[]> {
+  const handle = await fs.directory(dir || "/");
+  if (!handle) return [];
+  return (await handle.entries()).map((entry) => entry.name);
+}
+
 /** Resolve `name` in `dir` case-insensitively, returning the real path. */
-export async function resolveFile(source: Source, dir: string, name: string): Promise<string> {
+export async function resolveFile(fs: CsFileSystem, dir: string, name: string): Promise<string> {
+  const direct = joinPath(dir, name);
+  if (await fs.stat(direct)) return direct;
   const wanted = name.toLowerCase();
-  for (const entry of await source.list(dir)) {
+  for (const entry of await listDirectory(fs, dir)) {
     if (entry.toLowerCase() === wanted) return joinPath(dir, entry);
   }
-  throw new Error(`${joinPath(dir, name)}: not found`);
+  throw new Error(`${direct}: not found`);
 }
 
 /**
- * Names that fill the `@` in a template, from what is actually on disk.
+ * Names that fill the `@` in a template, from what is actually present.
  *
  * Beware the degenerate case: `catalog`'s template is `@.bin`, which matches
  * *every* `.bin` in the directory. Callers wanting catalogue ids should read
- * them from `CInfo`, which lists them authoritatively, rather than trusting
- * this.
+ * them from `CInfo`, which lists them authoritatively.
  */
 export async function findVariants(
-  source: Source,
+  fs: CsFileSystem,
   dir: string,
   template: string,
 ): Promise<string[]> {
@@ -62,7 +76,7 @@ export async function findVariants(
   const prefix = template.slice(0, at).toLowerCase();
   const suffix = template.slice(at + 1).toLowerCase();
   const found = new Set<string>();
-  for (const entry of await source.list(dir)) {
+  for (const entry of await listDirectory(fs, dir)) {
     const lower = entry.toLowerCase();
     if (!lower.startsWith(prefix) || !lower.endsWith(suffix)) continue;
     if (entry.length <= prefix.length + suffix.length) continue;
@@ -72,6 +86,8 @@ export async function findVariants(
 }
 
 export class Dataset {
+  private cachedWhole?: Uint8Array;
+
   private constructor(
     readonly name: string,
     readonly dir: string,
@@ -80,22 +96,27 @@ export class Dataset {
     readonly fdt: Fdt,
     readonly index: PntIndex,
     readonly fields: NamedField[],
-    private readonly bin: Reader,
-    private readonly binPath: string,
+    private readonly bin: CsFile,
   ) {}
 
-  static async open(source: Source, dir: string, name: string, variant?: string): Promise<Dataset> {
-    const ddmPath = await resolveFile(source, dir, `${name}.ddm`);
-    const ddm = parseDdm(await source.readFile(ddmPath));
-    const fdtPath = await resolveFile(source, dir, ddm.fdt ?? `${name}.fdt`);
-    const fdt = parseFdt(await source.readFile(fdtPath));
+  static async open(
+    fs: CsFileSystem,
+    dir: string,
+    name: string,
+    variant?: string,
+  ): Promise<Dataset> {
+    const ddmPath = await resolveFile(fs, dir, `${name}.ddm`);
+    const ddm = parseDdm(await mustRead(fs, ddmPath));
+    const fdtPath = await resolveFile(fs, dir, ddm.fdt ?? `${name}.fdt`);
+    const fdt = parseFdt(await mustRead(fs, fdtPath));
 
     const fill = (template: string) => template.replace("@", variant ?? "");
-    const binPath = await resolveFile(source, dir, fill(fdt.binTemplate));
-    const pntPath = await resolveFile(source, dir, fill(fdt.pntTemplate));
+    const binPath = await resolveFile(fs, dir, fill(fdt.binTemplate));
+    const pntPath = await resolveFile(fs, dir, fill(fdt.pntTemplate));
 
-    const index = new PntIndex(await source.readFile(pntPath), fdt);
-    const bin = await source.open(binPath);
+    const index = new PntIndex(await mustRead(fs, pntPath), fdt);
+    const bin = await fs.file(binPath);
+    if (!bin) throw new Error(`${binPath}: not found`);
 
     return new Dataset(
       name,
@@ -106,17 +127,16 @@ export class Dataset {
       index,
       nameFields(fdt.fields, ddm.fields),
       bin,
-      binPath,
     );
   }
 
   /** Which `@` values exist for this dataset's `.bin` template. */
-  static async variants(source: Source, dir: string, name: string): Promise<string[]> {
-    const ddmPath = await resolveFile(source, dir, `${name}.ddm`);
-    const ddm = parseDdm(await source.readFile(ddmPath));
-    const fdtPath = await resolveFile(source, dir, ddm.fdt ?? `${name}.fdt`);
-    const fdt = parseFdt(await source.readFile(fdtPath));
-    return findVariants(source, dir, fdt.binTemplate);
+  static async variants(fs: CsFileSystem, dir: string, name: string): Promise<string[]> {
+    const ddmPath = await resolveFile(fs, dir, `${name}.ddm`);
+    const ddm = parseDdm(await mustRead(fs, ddmPath));
+    const fdtPath = await resolveFile(fs, dir, ddm.fdt ?? `${name}.fdt`);
+    const fdt = parseFdt(await mustRead(fs, fdtPath));
+    return findVariants(fs, dir, fdt.binTemplate);
   }
 
   get count(): number {
@@ -124,16 +144,21 @@ export class Dataset {
   }
 
   get path(): string {
-    return this.binPath;
+    return this.bin.path;
+  }
+
+  private async read(pos: number, len: number): Promise<Uint8Array> {
+    if (len === 0) return new Uint8Array(0);
+    return this.bin.slice(pos, pos + len).bytes();
   }
 
   /** The record at index position `i`. */
   async at(i: number): Promise<DatasetEntry> {
     const offset = this.index.offsetAt(i);
-    const header = await this.bin.read(offset, 2);
+    const header = await this.read(offset, 2);
     if (header.length < 2) throw new Error(`${this.name}: no record at offset ${offset}`);
     const length = header[0]! | (header[1]! << 8);
-    const body = await this.bin.read(offset + 2, length);
+    const body = await this.read(offset + 2, length);
     const { record, used } = decodeRecord(body, this.fdt);
     if (used !== length) {
       throw new Error(
@@ -151,41 +176,46 @@ export class Dataset {
   }
 
   /**
-   * Look up many keys in one batch.
+   * Every record of the run that index entry `i` points at.
    *
-   * Two rounds of `readMany` — lengths, then bodies — so a plate view costs two
-   * round trips rather than two per part.
+   * Index offsets are monotonic, so a run ends where the next entry begins.
+   * That makes a run a single bounded read rather than a scan of the file: 186
+   * bytes on average for `Vin`, 18 kB at worst. This is the path the browser
+   * uses — `A/VIN.BIN` is 76 MB and is never read whole.
    */
-  async getMany(keys: readonly PntKey[]): Promise<(LexRecord | undefined)[]> {
-    const positions = keys.map((k) => this.index.find(k));
-    const present = positions.filter((p) => p !== -1).map((p) => this.index.offsetAt(p));
-    const headers = await this.bin.readMany(present.map((o) => [o, 2] as const));
-    const lengths = headers.map((h) => h[0]! | (h[1]! << 8));
-    const bodies = await this.bin.readMany(present.map((o, i) => [o + 2, lengths[i]!] as const));
+  async readRun(i: number, inherit: readonly string[] = []): Promise<LexRecord[]> {
+    if (i < 0 || i >= this.index.count) return [];
+    const from = this.index.offsetAt(i);
+    const to = i + 1 < this.index.count ? this.index.offsetAt(i + 1) : this.bin.size;
+    const window = await this.read(from, to - from);
 
-    const out: (LexRecord | undefined)[] = [];
-    let cursor = 0;
-    for (const position of positions) {
-      if (position === -1) {
-        out.push(undefined);
-        continue;
+    const out: LexRecord[] = [];
+    const carry: LexRecord = {};
+    let at = 0;
+    while (at + 2 <= window.length) {
+      const length = window[at]! | (window[at + 1]! << 8);
+      if (length === 0) break;
+      const { record, used } = decodeRecord(window.subarray(at + 2, at + 2 + length), this.fdt);
+      if (used !== length) {
+        throw new Error(`${this.name} run ${i}: fields consumed ${used} of ${length} bytes`);
       }
-      const body = bodies[cursor]!;
-      const { record, used } = decodeRecord(body, this.fdt);
-      if (used !== lengths[cursor]!) {
-        throw new Error(`${this.name}: fields consumed ${used} of ${lengths[cursor]} bytes`);
-      }
+      inheritInto(record, carry, inherit);
       out.push(record);
-      cursor++;
+      at += 2 + length;
     }
     return out;
+  }
+
+  /** The run for `key`, or an empty array when the key is not indexed. */
+  async runFor(key: PntKey, inherit: readonly string[] = []): Promise<LexRecord[]> {
+    return this.readRun(this.index.find(key), inherit);
   }
 
   /**
    * The records the index points at — one per run, not one per record.
    *
-   * For most datasets the index covers every record, but for the navigation
-   * and parts tables it does not: see `scan`.
+   * For most datasets the index covers every record, but for the navigation and
+   * parts tables it does not: see `scan`.
    */
   async *indexEntries(): AsyncGenerator<DatasetEntry> {
     const whole = await this.whole();
@@ -203,18 +233,17 @@ export class Dataset {
    * **The index does not cover every record.** It points at the first record of
    * each run: 259 entries for `SGroup`'s 34,555 records, 5,150 for a
    * catalogue's 77,556. Records after the first in a run omit the fields that
-   * have not changed, and those fields have to be inherited from the preceding
-   * record or the row is meaningless — a part with no PNC and no model.
+   * have not changed, and those fields have to be inherited or the row is
+   * meaningless — a part with no PNC and no model.
    *
    * `inherit` must list only the run-key fields. Carrying *every* absent field
    * forward is wrong and dangerously so: `E1` (OPC) and `E2` (Classification)
    * are per-record applicability, and propagating them makes a part look like
-   * it fits a vehicle it does not. On one plate that turns 1 option-restricted
-   * part into 42. See `deriveRunKey` for how the right set is established.
+   * it fits a vehicle it does not.
    *
-   * This pulls the whole `.bin` into memory. That is what the CLI wants, and
-   * what the browser wants for a single catalogue (a few MB); it is not what
-   * either wants for `VIN.BIN` at 76 MB.
+   * This reads the whole `.bin`. That is what the CLI wants, and what the
+   * browser wants for one catalogue (a few MB); it is not what either wants for
+   * `VIN.BIN` at 76 MB.
    */
   async *scan(inherit: readonly string[] = []): AsyncGenerator<ScanEntry> {
     const whole = await this.whole();
@@ -224,11 +253,7 @@ export class Dataset {
       const length = whole[at]! | (whole[at + 1]! << 8);
       if (length === 0) break;
       const { record } = this.decodeAt(whole, at, `offset ${at}`);
-      for (const code of inherit) {
-        const value = record[code];
-        if (value !== undefined) carry[code] = value;
-        else if (carry[code] !== undefined) record[code] = carry[code]!;
-      }
+      inheritInto(record, carry, inherit);
       yield {
         offset: at,
         record,
@@ -239,49 +264,6 @@ export class Dataset {
     if (at !== whole.length) {
       throw new Error(`${this.name}: sequential scan ended at ${at} of ${whole.length} bytes`);
     }
-  }
-
-  /**
-   * Every record of the run that index entry `i` points at.
-   *
-   * Index offsets are monotonic, so a run ends where the next entry begins.
-   * That makes a run a single bounded range read rather than a scan of the
-   * file: 186 bytes on average for `Vin`, 18 KB at worst. This is the path the
-   * browser uses — `A/VIN.BIN` is 76 MB and is never downloaded.
-   *
-   * `inherit` is applied within the run, seeded from its first record, which is
-   * self-sufficient by definition of a run start.
-   */
-  async readRun(i: number, inherit: readonly string[] = []): Promise<LexRecord[]> {
-    if (i < 0 || i >= this.index.count) return [];
-    const from = this.index.offsetAt(i);
-    const to = i + 1 < this.index.count ? this.index.offsetAt(i + 1) : await this.bin.size();
-    const window = await this.bin.read(from, to - from);
-
-    const out: LexRecord[] = [];
-    const carry: LexRecord = {};
-    let at = 0;
-    while (at + 2 <= window.length) {
-      const length = window[at]! | (window[at + 1]! << 8);
-      if (length === 0) break;
-      const { record, used } = decodeRecord(window.subarray(at + 2, at + 2 + length), this.fdt);
-      if (used !== length) {
-        throw new Error(`${this.name} run ${i}: fields consumed ${used} of ${length} bytes`);
-      }
-      for (const code of inherit) {
-        const value = record[code];
-        if (value !== undefined) carry[code] = value;
-        else if (carry[code] !== undefined) record[code] = carry[code]!;
-      }
-      out.push(record);
-      at += 2 + length;
-    }
-    return out;
-  }
-
-  /** The run for `key`, or an empty array when the key is not indexed. */
-  async runFor(key: PntKey, inherit: readonly string[] = []): Promise<LexRecord[]> {
-    return this.readRun(this.index.find(key), inherit);
   }
 
   /** Byte offsets of every record, for checking the index lands on boundaries. */
@@ -298,10 +280,8 @@ export class Dataset {
     return offsets;
   }
 
-  private cachedWhole?: Uint8Array;
-
   private async whole(): Promise<Uint8Array> {
-    this.cachedWhole ??= await this.bin.read(0, await this.bin.size());
+    this.cachedWhole ??= await this.bin.bytes();
     return this.cachedWhole;
   }
 
@@ -330,9 +310,6 @@ export class Dataset {
    * it on the biggest catalogues: a single-model catalogue omits `A2` even at
    * run starts, so that test drops `A2` for three of the 52 and the derived key
    * would disagree with itself between files.
-   *
-   * `alwaysAtStart` is reported too, since a field in `neverContinued` but not
-   * in `alwaysAtStart` is one whose first record simply did not set it.
    */
   async deriveRunKey(): Promise<{
     runKey: string[];
@@ -381,19 +358,30 @@ export class Dataset {
     };
   }
 
+  /** Release the cached `.bin` contents. */
   async close(): Promise<void> {
-    await this.bin.close?.();
+    this.cachedWhole = undefined;
   }
+}
+
+function inheritInto(record: LexRecord, carry: LexRecord, inherit: readonly string[]): void {
+  for (const code of inherit) {
+    const value = record[code];
+    if (value !== undefined) carry[code] = value;
+    else if (carry[code] !== undefined) record[code] = carry[code]!;
+  }
+}
+
+async function mustRead(fs: CsFileSystem, path: string): Promise<Uint8Array> {
+  const bytes = await fs.read(path);
+  if (!bytes) throw new Error(`${path}: not found`);
+  return bytes;
 }
 
 function nameFields(fields: Field[], ddmFields: DdmField[]): NamedField[] {
   const byCode = new Map(ddmFields.map((f) => [f.code, f]));
   return fields.map((field) => {
     const ddm = byCode.get(field.code);
-    return {
-      ...field,
-      kind: ddm?.kind,
-      name: ddm?.comment || field.label,
-    };
+    return { ...field, kind: ddm?.kind, name: ddm?.comment || field.label };
   });
 }
