@@ -21,7 +21,8 @@
     "@masax/core": "workspace:*",
     "@masax/illust": "workspace:*",
     "@masax/lex": "workspace:*",
-    "@masax/importer": "workspace:*"
+    "@masax/importer": "workspace:*",
+    "@lucide/svelte": "^1.40.0"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.0",

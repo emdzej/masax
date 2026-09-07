@@ -24,19 +24,30 @@ export interface Disc {
   survey: Survey;
   /** One line saying what was found, for the interface. */
   summary: string;
+  /** Kept so it can be stored in IndexedDB and reopened next visit. */
+  handle?: FileSystemDirectoryHandle;
 }
 
 export const canPickDirectory = isFsaSupported;
 export const canStoreOffline = isOpfsSupported;
 
-/** Ask for a directory and work out what is in it. */
-export async function addDisc(): Promise<Disc> {
-  const handle = await pickDirectory("read");
+/** Wrap a handle we already have, and work out what is in it. */
+export async function discFromHandle(handle: FileSystemDirectoryHandle): Promise<Disc> {
   // Case-insensitive because the data is: `PNC.BIN` sits beside `pnc.pnt`, and
   // disc A spells it `Illust` where disc B spells it `ILLUST`.
   const fs = fsaFileSystem(handle, { caseInsensitive: true });
   const found = await survey(fs);
-  return { name: handle.name, fs, survey: found, summary: describeSurvey(found) };
+  return { name: handle.name, fs, survey: found, summary: describeSurvey(found), handle };
+}
+
+/** Ask for a directory and work out what is in it. */
+export async function addDisc(): Promise<Disc> {
+  return discFromHandle(await pickDirectory("read"));
+}
+
+/** Rebuild the disc list from remembered handles, in order. */
+export async function reopenDiscs(handles: FileSystemDirectoryHandle[]): Promise<Disc[]> {
+  return Promise.all(handles.map(discFromHandle));
 }
 
 export interface Opened {

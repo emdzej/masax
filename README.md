@@ -77,16 +77,24 @@ masax import /Volumes/MMC-A "/Volumes/MMC ASA 2" -o data/M60
 
 ## The app
 
-A Svelte 5 client, 34 kB gzipped, no backend. Choosing a folder is the primary
-path: `File.slice()` is a range read, so a mounted disc is read in place and a
-76 MB `VIN.BIN` never leaves it. Add both discs and they are overlaid the same
-way the CLI does it. HTTP is the fallback, for a hosted tree and for browsers
-without the File System Access API; OPFS keeps a copy for offline use.
+A Svelte 5 client, 47 kB gzipped, no backend and no data server.
+
+On first run it asks where the data is, and that choice is remembered — the same
+panel is reachable later from the gear. **Choosing a folder is the primary path**:
+`File.slice()` is a range read, so a mounted disc is read in place and a 76 MB
+`VIN.BIN` never leaves it. Add both discs and they are overlaid the way the CLI
+does it. A hosted tree over HTTP is the fallback, for browsers without the File
+System Access API; OPFS can keep a copy for offline use.
 
 ```sh
-pnpm dev                                     # then choose a folder
-masax serve data/M60 --app apps/web/dist     # or host an imported tree
+pnpm dev        # then point it at a folder — no data server involved
 ```
+
+The car sits in a toolbar across the top — VIN, catalogue, model — with the
+decoded vehicle on a strip beneath it, so "which car am I looking at" stays on
+screen. Group and plate are filterable lists on the left, matching on the number
+as well as the name, because the number is often what you already know. The
+drawing gets the larger share of the width, with the parts beside it.
 
 The drawings are Group 4 TIFFs behind a byte obfuscation, so they are decoded in
 the browser rather than converted first — which is what lets the app read a disc

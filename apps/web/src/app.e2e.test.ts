@@ -94,14 +94,13 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
       }
     });
     await page.goto(base);
-    // The picked-directory path is the primary one and needs a real user
-    // gesture against a real folder, so the browser test drives the HTTP
-    // fallback. It lives behind a disclosure, which has to be opened first.
-    await page.getByText("or a tree hosted over HTTP").click();
+    // The picked-directory path is the primary one and needs a real gesture
+    // against a real folder, so the browser test drives the HTTP fallback. On a
+    // first run the settings panel is already open and asking.
     await page.getByPlaceholder(/example\.org/).fill(`${base}/data/M60/`);
     await page.getByRole("button", { name: "Open", exact: true }).click();
     try {
-      await page.locator("select[size]").waitFor({ timeout: 90_000 });
+      await page.locator("select#catalogue").waitFor({ timeout: 90_000 });
     } catch (cause) {
       // Surface what the page actually said rather than just the timeout.
       const shown = await page.locator("body").innerText();
@@ -118,24 +117,24 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
   });
 
   it("lists the catalogues from CInfo", async () => {
-    const options = page.locator("select[size] option");
+    const options = page.locator("select#catalogue option");
     await expect.poll(() => options.count(), { timeout: 30_000 }).toBeGreaterThan(10);
-    expect(await options.first().textContent()).toBeTruthy();
+    expect(await options.nth(1).textContent()).toBeTruthy();
   });
 
   it("walks catalogue, model, group and plate to a drawing and its parts", async () => {
-    await page.selectOption("select[size]", "B6037609A");
-    await page.getByRole("button", { name: "L042G", exact: true }).click();
+    await page.selectOption("select#catalogue", "B6037609A");
+    await page.selectOption("select#model", "L042G");
     await page.getByRole("button", { name: /^13\s/ }).click();
     // 13-010 is FUEL TANK; its drawing is 113_0103KC1A0T.
     await page.getByRole("button", { name: /010\s+FUEL TANK/ }).click();
 
-    // The caption gains the size only once the drawing has decoded, so poll
-    // for the whole string rather than for the name and then reading again.
-    const caption = page.locator("figcaption");
-    await expect
-      .poll(() => caption.textContent(), { timeout: 30_000 })
-      .toMatch(/113_0103KC1A0T — 960×1210/);
+    // The title block gains the pixel size only once the drawing has decoded,
+    // so poll for the whole block rather than reading it twice.
+    const block = page.locator("figcaption.block");
+    await expect.poll(() => block.textContent(), { timeout: 30_000 }).toMatch(/113_0103KC1A0T/);
+    await expect.poll(() => block.textContent()).toMatch(/960×1210/);
+    expect(await block.textContent()).toContain("13-010");
 
     const rows = page.locator("tbody tr");
     await expect.poll(() => rows.count(), { timeout: 30_000 }).toBeGreaterThan(30);
@@ -161,30 +160,44 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
     expect(ink).toBeLessThan(960 * 1210 * 0.5);
   });
 
+  it("filters the group list by number and by name", async () => {
+    const groups = page.locator("section.rail").first();
+    const before = await groups.locator("button.row").count();
+    expect(before).toBeGreaterThan(10);
+
+    await groups.getByPlaceholder("Filter groups").fill("fuel");
+    await expect.poll(() => groups.locator("button.row").count()).toBeLessThan(before);
+    expect(await groups.locator("button.row").first().textContent()).toMatch(/FUEL/);
+
+    // The code is searchable too, because it is often what the user knows.
+    await groups.getByPlaceholder("Filter groups").fill("13");
+    await expect.poll(() => groups.locator("button.row").count()).toBeGreaterThan(0);
+    expect(await groups.locator("button.row").first().textContent()).toMatch(/13/);
+
+    await groups.getByPlaceholder("Filter groups").fill("");
+    await expect.poll(() => groups.locator("button.row").count()).toBe(before);
+  });
+
   it("decodes a VIN that carries its own specification", async () => {
     // One of the 3.1% of records that hold the model directly.
-    await page.getByPlaceholder(/VIN/).fill("JMAGZP02VHA000001");
+    await page.locator("input#vin").fill("JMAGZP02VHA000001");
     await page.getByRole("button", { name: "Decode" }).click();
-    const vehicle = page.locator("dl.vehicle");
-    await expect.poll(() => vehicle.count(), { timeout: 30_000 }).toBeGreaterThan(0);
-    const text = await vehicle.first().textContent();
-    expect(text).toContain("P02V");
-    expect(text).toContain("1986-11");
+    const strip = page.locator(".strip");
+    await expect.poll(() => strip.textContent(), { timeout: 30_000 }).toContain("P02V");
+    expect(await strip.textContent()).toContain("1986-11");
   });
 
   it("follows the XREF for a VIN whose record has no specification", async () => {
     // The other 96.9%. Before the XREF was followed this decoded to a build
     // date and nothing else, which reads as "not in the data".
-    await page.getByPlaceholder(/VIN/).fill("JMB0RV250RJ000188");
+    await page.locator("input#vin").fill("JMB0RV250RJ000188");
     await page.getByRole("button", { name: "Decode" }).click();
-    const vehicle = page.locator("dl.vehicle").first();
-    await expect
-      .poll(() => vehicle.textContent(), { timeout: 30_000 })
-      .toContain("V25W");
-    const text = await vehicle.textContent();
+    const strip = page.locator(".strip");
+    await expect.poll(() => strip.textContent(), { timeout: 30_000 }).toContain("V25W");
+    const text = await strip.textContent();
     expect(text).toContain("GRXML6");
     expect(text).toContain("1994-03");
     // and the interface says where the specification came from
-    expect(await page.locator(".via").first().textContent()).toContain("J000153");
+    expect(text).toContain("J000153");
   });
 });

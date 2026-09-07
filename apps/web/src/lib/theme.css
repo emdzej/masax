@@ -1,0 +1,92 @@
+/*
+ * masax — Mitsubishi parts catalogue.
+ *
+ * A parts-desk tool: dense, monospace-forward, quiet. The greys are cool so the
+ * one warm colour never has to compete with them, and the red is rationed to
+ * three jobs — the mark, the current selection, and the decode action. If it
+ * appears anywhere else, that is a bug.
+ *
+ * Text sits at #1C1C1E rather than black on purpose: the drawings are 1-bit
+ * line art in pure black, and the interface should read as one step back from
+ * the sheet rather than competing with it.
+ */
+:root {
+  --red: #e60012;
+  --red-deep: #a3000d;
+  --red-wash: #fdecee;
+
+  --ink: #1c1c1e;
+  --steel: #6b6f76;
+  --steel-light: #9aa0a8;
+
+  --rule: #c9ccd1;
+  --rule-soft: #e4e6e9;
+  --panel: #f2f3f5;
+  --sheet: #ffffff;
+  --shade: #fafbfc;
+
+  --mono:
+    ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --ui:
+    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* An engineering drawing has no soft corners. Two radii, both nearly nothing. */
+  --r: 2px;
+  --r-lg: 3px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--panel);
+  color: var(--ink);
+  font:
+    13px/1.45 var(--ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * The label style, borrowed from the annotations on the drawings themselves:
+ * small, tracked out, upper case, steel. Applied to every field label and
+ * column head so the interface has one voice for "this is what that is".
+ */
+.label {
+  font: 600 10px/1 var(--ui);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--steel);
+}
+
+/* Codes, part numbers, dates: the loudest thing on the page, because they are
+   what gets read out to a customer. */
+.code {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--red);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pressable {
+    transition:
+      background-color 90ms linear,
+      border-color 90ms linear;
+  }
+}
