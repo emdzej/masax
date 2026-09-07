@@ -17,7 +17,22 @@ carry whole records, not byte patches. The `<nn>` suffix identifies the dataset:
 
 Usage: delta.py <file.Unn> [...]
 """
-import struct, sys, os, collections
+import struct, sys, os, collections, zlib
+
+def checksum(data):
+    """The checksum DeltaUpd publishes in its recipe.
+
+    Ordinary reflected CRC32 (poly 0xEDB88320) but with the accumulator
+    initialised to 0 and no final complement, which is why standard CRC32 does
+    not reproduce the published values. `FUN_004057d0` in DeltaUpd.exe zeroes
+    the accumulator before streaming the file through the table loop and
+    returns it unmodified.
+
+    zlib's crc32 computes ~loop(~prev, data), so loop(0, data) is recovered as
+    ~crc32(data, 0xFFFFFFFF).
+    """
+    return (~zlib.crc32(data, 0xFFFFFFFF)) & 0xFFFFFFFF
+
 
 ADD, DELETE, UPDATE = 0x41, 0x44, 0x55
 OPS = {ADD: 'add', DELETE: 'delete', UPDATE: 'update'}

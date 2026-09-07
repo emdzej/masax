@@ -53,6 +53,21 @@ before being caught:
   once at the front makes the first operation parse and every later one fail on
   a bogus opcode -- which reads like an unknown format rather than an off-by-4.
 
+## The DeltaUpd checksum
+
+Reflected CRC32, poly `0xEDB88320`, **accumulator initialised to 0 and no final
+complement**. The binary's own error strings call it "CRC32", and the table at
+`0x41c7ec` is the standard one, so it is easy to conclude the algorithm is
+standard and the *input* must be unusual — and then to go hunting for the right
+byte range. It is the other way round: the input is the whole file and the
+init/final are non-standard.
+
+The published value describes the target **after** the update, not before.
+Prove that direction rather than assuming it: update 089's `PNC.U11` adds PNCs
+`98127`/`98128`, and checking whether they are present in a tree tells you which
+side of the patch its checksum represents. Both readings are self-consistent
+against the checksums alone.
+
 ## Illustrations are not TIFFs
 
 They are named `*.tif` and they are TIFFs *after* XOR-ing with `0x0b` -- except

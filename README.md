@@ -9,9 +9,8 @@ Renault/Dacia's Dialogys.
 
 ## Status
 
-The container format, the schema, the illustrations and the update packages are
-all decoded. One thing is open: the checksum `DeltaUpd.exe` uses to validate a
-file before patching it (see [`docs/media.md`](docs/media.md)).
+The container format, the schema, the illustrations, the update packages and
+their checksum are all decoded.
 
 ```
 $ python3 re/tools/verify.py <media>/M60

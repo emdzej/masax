@@ -75,12 +75,18 @@ is simply the September 2008 release rather than update level 89.
 The update packages **are** unpacked now — they are Wise Installer
 self-extractors, and `re/tools/unwise.py` recovers their payloads. Each carries
 a plain-text recipe for `DeltaUpd.exe` plus `.U<nn>` record deltas, both
-documented in [`data-format.md`](data-format.md#delta-updates). What is still
-missing is the checksum algorithm the recipe uses to validate a target before
-patching: it is not CRC32 in any orientation, so an applier could run but could
-not verify its output. Note also that none of the 34 updates' published
-checksums correspond to the media files under any common algorithm, so the
-media's exact update level is not yet established.
+documented in [`data-format.md`](data-format.md#delta-updates). The recipe's checksum is
+reflected CRC32 with a zero init and no final complement, and it describes the
+target *after* patching — see
+[`data-format.md`](data-format.md#the-checksum).
+
+**The shipped delta chain is not applicable to these discs.** None of the 769
+published checksums matches any media file, while the same search finds 77
+matches against an update-derived installation. The discs are a freshly
+mastered 2008-09-19 snapshot rather than the output of the chain, so their bytes
+differ from an updated tree even where the content agrees. Updates 056-089 are
+there to bring older installations forward. If you want a level-89 tree, take it
+from an installation that reached it, not by patching this media.
 
 Record counts, media versus the updated dump:
 

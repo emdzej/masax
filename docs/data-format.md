@@ -303,17 +303,31 @@ program directories and the new update level:
 ?9J3%4\ASAMAIN.INI   U   M60   UPDLEVEL_EPC   %L
 ```
 
-`#A` applies a delta: *target `.bin`*, *an 8-hex-digit checksum of the target*,
-*the delta file*, *the schema `.fdt`*. `#1` copies a file set, `#6` copies a
-single file, `#9H*` sets up logging, and a `?` prefix marks a step as optional.
-The last line is what bumps `UPDLEVEL_EPC` in `ASAMAIN.ini`.
+`#A` applies a delta: *target `.bin`*, *an 8-hex-digit checksum*, *the delta
+file*, *the schema `.fdt`*. `#1` copies a file set, `#6` copies a single file,
+`#9H*` sets up logging, and a `?` prefix marks a step as optional. The last line
+is what bumps `UPDLEVEL_EPC` in `ASAMAIN.ini`.
 
-The checksum is what produces the application's "not a valid previous version
-and could not be upgraded" error. **It is not a plain CRC32.** Neither CRC32,
-its complement, a byte-swap, nor Adler-32 over the whole target file reproduces
-any of the published values, against base media or an updated tree. Identifying
-it needs `DeltaUpd.exe` reversed, and until then a delta applier cannot verify
-what it produces.
+### The checksum
+
+It is **reflected CRC32 (poly `0xEDB88320`) with the accumulator initialised to
+0 and no final complement.** Standard CRC32 initialises to `0xFFFFFFFF` and
+complements the result, which is why it reproduces none of the published values.
+`DeltaUpd.exe` builds the ordinary table at `0x41c7ec`, and `FUN_004057d0`
+zeroes the accumulator, streams the file through `FUN_00405790` in 64 KB
+chunks, and returns it unmodified.
+
+```python
+def checksum(data):                       # re/tools/delta.py
+    return (~zlib.crc32(data, 0xFFFFFFFF)) & 0xFFFFFFFF
+```
+
+The published value is the expected checksum of the target **after** the update
+is applied, not before. Across all 34 update recipes this reproduces 77 exact
+target-name-and-value matches against an installation at level 89, and for every
+file the matching level is 089 — the last update. That it is the *post* state is
+settled independently: update 089's `PNC.U11` adds part-name codes `98127` and
+`98128`, and both are present in that tree and absent from the base data.
 
 ### The `.U<nn>` delta files
 
@@ -342,6 +356,16 @@ python3 re/tools/delta.py <tree>/M60/UPDATE/Temp/Daten/*.U[0-9][0-9]
 
 All 19 deltas left in a real installation's `UPDATE/Temp/Daten`, and all 10
 carried by update 056, frame exactly.
+
+### The shipped chain does not apply to this media
+
+None of the 769 distinct checksums published across updates 056-089 matches any
+file on the discs, under any CRC variant tried — while the same search finds 77
+matches against an update-derived tree. The discs are a freshly mastered
+snapshot dated 2008-09-19, not the result of running the chain, so their bytes
+differ from an updated tree even where the logical content agrees. The update
+packages on disc A exist to bring *older installations* forward; they are not a
+patch series for the media itself.
 
 ## Reading a vehicle
 
