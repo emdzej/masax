@@ -20,7 +20,9 @@ export class HttpSource implements Source {
   ) {}
 
   static async load(base: string): Promise<HttpSource> {
-    const root = base.endsWith("/") ? base : `${base}/`;
+    // Resolve against the page first: a relative tree like `/data/` is not a
+    // valid base for `new URL`, which needs an absolute one.
+    const root = new URL(base.endsWith("/") ? base : `${base}/`, location.href).toString();
     const url = new URL("manifest.json", root);
     const res = await fetch(url);
     if (!res.ok) {

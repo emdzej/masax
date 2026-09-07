@@ -3,6 +3,7 @@ import { Command, Option } from "@commander-js/extra-typings";
 import type { Language } from "@masax/core";
 import { checkIllustrations, convertIllustrations, showIllustration } from "./illust.js";
 import { writeManifest } from "./manifest.js";
+import { serve } from "./serve.js";
 import { decodeVin, show } from "./show.js";
 import { verify } from "./verify.js";
 
@@ -68,6 +69,21 @@ program
   .option("-o, --out <file>", "where to write it", "manifest.json")
   .action(async (root, options) => {
     process.exitCode = await writeManifest(root, options.out);
+  });
+
+program
+  .command("serve")
+  .description("serve a data tree over HTTP with Range support, and optionally the client")
+  .argument("<root>", "an ASA module directory, e.g. /mnt/asa/M60")
+  .option("-p, --port <n>", "port to listen on", "8787")
+  .option("-H, --host <name>", "address to bind", "127.0.0.1")
+  .option("-a, --app <dir>", "also serve a built client from this directory")
+  .action(async (root, options) => {
+    process.exitCode = await serve(root, {
+      port: Number(options.port),
+      host: options.host,
+      app: options.app,
+    });
   });
 
 program

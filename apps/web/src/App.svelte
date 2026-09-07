@@ -22,7 +22,8 @@
     }
   }
 
-  let remote = $state("");
+  let remote = $state(new URLSearchParams(location.search).get("tree") ?? "");
+
   async function openRemote() {
     if (!remote) return;
     try {
@@ -31,6 +32,12 @@
       app.error = (cause as Error).message;
     }
   }
+
+  // `?tree=<url>` opens a tree without the user typing it, so a served
+  // instance can be handed over as one link.
+  $effect(() => {
+    if (remote && !app.catalogue && !app.busy && !app.error) void openRemote();
+  });
 </script>
 
 <header>
