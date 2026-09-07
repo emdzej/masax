@@ -58,7 +58,7 @@ September 2008.
 ```
 re/tools/lexdb.py    the reader: .ddm/.fdt/.bin/.pnt
 re/tools/verify.py   decode everything and check every record's length
-re/bin/              PE binaries staged for a decompiler
+re/tools/stage.sh    copy the PE binaries worth decompiling into re/bin/
 ```
 
 ```sh

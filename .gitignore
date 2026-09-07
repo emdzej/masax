@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+
+# Vendor binaries, staged locally for a decompiler. Not ours to redistribute;
+# stage them yourself from PROG/ with re/tools/stage.sh.
+re/bin/
+
+# Extracted media and installation trees.
+out/
+media/
+discs/
