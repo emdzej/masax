@@ -8,8 +8,8 @@ A delta is a flat sequence of operations against one dataset's `.bin`:
     uint16 length      payload length
     bytes  payload     a record body, encoded exactly as in .bin
 
-So the payload is read with the ordinary `lexdb` record decoder -- the deltas
-carry whole records, not byte patches. The `<nn>` suffix identifies the dataset:
+So a payload decodes with the ordinary record reader in `packages/lex` -- the
+deltas carry whole records, not byte patches. The `<nn>` suffix identifies the dataset:
 
     U00 Vin      U03 MGroup   U04 SGroup   U05 BGroup   U06 OInfo
     U07 Opc      U09 Desc     U10 catalog  U11 pnc      U12 PBook

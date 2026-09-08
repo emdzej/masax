@@ -28,10 +28,13 @@ storage order, and additionally checks that the walk ends exactly at the end of
 the file, that every index offset lands on a record boundary, and that the
 declared run keys still match the data. It found every bug listed below.
 
-`re/tools/*.py` is the original Python reader, kept as a differential oracle for
-the parts of the format it covers. It is **not** authoritative: it validated only
-the indexed records, which is how the record count came to be understated by a
-factor of five.
+**There is no longer a second implementation to check against.** The Python
+reader that served as a differential oracle is gone, superseded by
+`packages/lex` and `masax verify`; keeping it would have meant maintaining a
+weaker checker, since it validated only the indexed records and understated the
+record count fivefold. `re/tools/` keeps just `unwise.py` and `delta.py`, which
+cover the update-package format and have no TypeScript equivalent, plus
+`stage.sh` for staging PE files into the gitignored `re/bin/`.
 
 ## The index does not enumerate the file
 

@@ -176,9 +176,13 @@ masax illust out/M60/ILLUST -o png/ --png           # convert them
 masax serve out/M60 -a apps/web/dist                # host the tree and client
 ```
 
-`re/tools/*.py` is the original Python reader, kept as a differential oracle for
-the parts of the format it covers. It is not authoritative — it validated only
-the indexed records, which understated the record count fivefold.
+`re/tools/` holds the two format tools with no TypeScript equivalent —
+`unwise.py` for the Wise self-extractors the update packages ship as, and
+`delta.py` for the `.U<nn>` record deltas and their checksum. Neither is needed
+to read the media; they are what backs the update-package sections of
+[`docs/data-format.md`](docs/data-format.md#delta-updates). The Python reader
+that preceded `packages/lex` is gone: it validated only the indexed records,
+which is how the record count came to be understated fivefold.
 
 ## Licence and intent
 

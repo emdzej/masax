@@ -104,7 +104,7 @@ The ISOs are plain ISO 9660 and stream straight out of the zip:
 ```sh
 unzip -p ASA_EUROPE.zip MMC_ASA_EUR_A.iso | bsdtar -xf - -C out/
 unzip -p ASA_EUROPE.zip MMC_ASA_EUR_B.iso | bsdtar -xf - -C out/
-python3 re/tools/verify.py out/M60          # expect 1,889,570/1,889,570
+masax verify out/M60                        # expect 9,495,097 records
 ```
 
 No installer, no dongle, and no registry state is needed to read the data — the

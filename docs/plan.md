@@ -112,9 +112,10 @@ size: PNG comes out _larger_ than the Group 4 original, 172 MB against 121 MB.
 
 ## 4. Order of work
 
-**Phase 1 — the engine. Done.** `packages/lex` in TypeScript, with the Python
-in `re/tools` as a differential oracle. `masax verify` ships with it and _is_
-the test: 9,495,097 records on the original media, every one consuming exactly
+**Phase 1 — the engine. Done.** `packages/lex` in TypeScript, written against
+a Python reader kept as a differential oracle until it was outgrown — it
+validated only the indexed records. `masax verify` ships with the engine and
+_is_ the test: 9,495,097 records on the original media, every one consuming exactly
 its declared length, plus the three structural invariants.
 
 **Phase 2 — the read path, no UI. Done.** `packages/catalogue`, exercised

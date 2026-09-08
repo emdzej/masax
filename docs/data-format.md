@@ -493,7 +493,7 @@ They are 1-bit bilevel, **CCITT Group 4**, typically 960x1210 (also 909x1187,
 decode to a valid TIFF -- verified, none fail:
 
 ```sh
-python3 re/tools/deillust.py --check <tree>/M60/ILLUST
+masax illust <tree>/M60/ILLUST --check
 ```
 
 The obfuscation sits on top of plain TIFF rather than being a container format:
