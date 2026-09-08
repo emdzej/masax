@@ -166,15 +166,11 @@ export async function decodeVin(
             `${chalk.bold(resolved.name ?? "")} model ${resolved.model}` +
             chalk.dim(
               `  (from ${resolved.via}` +
-                (resolved.alternatives.length
-                  ? `, over ${resolved.alternatives.join(", ")}`
-                  : "") +
+                (resolved.alternatives.length ? `, over ${resolved.alternatives.join(", ")}` : "") +
                 `)`,
             ),
         );
-        console.log(
-          chalk.dim(`    masax show <root> ${resolved.catalogue} ${resolved.model}`),
-        );
+        console.log(chalk.dim(`    masax show <root> ${resolved.catalogue} ${resolved.model}`));
       } else {
         console.log(chalk.yellow(`    no catalogue lists model ${row.model ?? "?"}`));
       }

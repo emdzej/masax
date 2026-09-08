@@ -1,11 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  CHASSIS_LENGTH,
-  MIN_VIN_LENGTH,
-  SERIAL_LENGTH,
-  VIN_LENGTH,
-  normaliseVin,
-} from "./vin.js";
+import { CHASSIS_LENGTH, MIN_VIN_LENGTH, SERIAL_LENGTH, VIN_LENGTH, normaliseVin } from "./vin.js";
 
 /** The split the decoder performs. Kept here so the test states the rule. */
 const split = (vin: string) => ({

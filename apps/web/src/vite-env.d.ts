@@ -17,3 +17,7 @@ interface FileSystemDirectoryHandle {
   queryPermission?(descriptor?: FileSystemHandlePermissionDescriptor): Promise<PermissionState>;
   requestPermission?(descriptor?: FileSystemHandlePermissionDescriptor): Promise<PermissionState>;
 }
+
+/** Injected by Vite from the root `package.json`. */
+declare const __MASAX_VERSION__: string;
+declare const __MASAX_REPOSITORY__: string;

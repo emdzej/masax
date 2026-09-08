@@ -25,10 +25,8 @@
   --sheet: #ffffff;
   --shade: #fafbfc;
 
-  --mono:
-    ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  --ui:
-    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 
   /* An engineering drawing has no soft corners. Two radii, both nearly nothing. */
   --r: 2px;
@@ -43,9 +41,36 @@ body {
   margin: 0;
   background: var(--panel);
   color: var(--ink);
-  font:
-    13px/1.45 var(--ui);
+  font: 13px/1.45 var(--ui);
   -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * At desk widths the window is the frame: nothing scrolls the page, and each
+ * pane scrolls itself. That is what keeps the drawing still while the parts
+ * list moves — on a parts desk you read a callout off the plate and then find
+ * it in the table, and a plate that scrolls away mid-comparison is the single
+ * most annoying thing a catalogue can do.
+ *
+ * Narrow screens get the ordinary page scroll instead, because the columns
+ * stack there and a locked viewport would trap the content.
+ */
+@media (min-width: 68rem) {
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+  }
+  /*
+   * The column lives on the mount point, not on `body`: Svelte mounts into
+   * `#app`, so `body` has exactly one child and a flex column there does
+   * nothing but stretch that div, which then grows with its content.
+   */
+  #app {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
 }
 
 /*

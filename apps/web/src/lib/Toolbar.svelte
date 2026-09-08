@@ -11,6 +11,8 @@
   import Settings2 from "@lucide/svelte/icons/settings-2";
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import Diamond from "./Diamond.svelte";
+  import GithubMark from "./GithubMark.svelte";
+  import { REPOSITORY, VERSION, releaseUrl } from "./build";
   import { formatAsaDate } from "@masax/core";
   import type { CatalogueInfo, VehicleCatalogue, VinRecord } from "@masax/catalogue";
 
@@ -29,6 +31,7 @@
     onCatalogue,
     onModel,
     onSettings,
+    onAbout,
   }: {
     catalogues: CatalogueInfo[];
     selectedCatalogue?: string;
@@ -44,13 +47,35 @@
     onCatalogue: (id: string) => void;
     onModel: (model: string) => void;
     onSettings: () => void;
+    onAbout: () => void;
   } = $props();
 </script>
 
 <header class="bar">
   <div class="brand">
-    <Diamond size={12} />
-    <span>masax</span>
+    <button class="wordmark" onclick={onAbout} title="About masax">
+      <Diamond size={12} />
+      <span>masa<span class="x">x</span></span>
+    </button>
+    <a
+      class="version code"
+      href={releaseUrl()}
+      target="_blank"
+      rel="noreferrer noopener"
+      title={`Release notes for v${VERSION}`}
+    >
+      v{VERSION}
+    </a>
+    <a
+      class="repo"
+      href={REPOSITORY}
+      target="_blank"
+      rel="noreferrer noopener"
+      aria-label="masax on GitHub"
+      title="masax on GitHub"
+    >
+      <GithubMark size={14} />
+    </a>
   </div>
 
   <div class="group">
@@ -152,16 +177,52 @@
   }
   .brand {
     display: flex;
-    align-items: center;
-    gap: 0.35rem;
+    align-items: baseline;
+    gap: 0.4rem;
     padding-bottom: 0.28rem;
     margin-right: 0.15rem;
   }
-  .brand span {
+  .wordmark {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 0;
+    background: none;
+    padding: 0;
+    color: inherit;
+  }
+  .wordmark span {
     font-size: 13.5px;
     font-weight: 700;
     letter-spacing: 0.055em;
     text-transform: lowercase;
+  }
+  /* The one letter that carries the accent, so the mark reads as a mark. */
+  .x {
+    color: var(--red);
+  }
+  .wordmark:hover span {
+    color: var(--red-deep);
+  }
+  .wordmark:hover .x {
+    color: var(--red);
+  }
+  .version {
+    font-size: 10.5px;
+    color: var(--steel-light);
+    text-decoration: none;
+  }
+  .version:hover {
+    color: var(--red-deep);
+    text-decoration: underline;
+  }
+  .repo {
+    display: flex;
+    align-self: center;
+    color: var(--steel-light);
+  }
+  .repo:hover {
+    color: var(--red-deep);
   }
 
   .group {

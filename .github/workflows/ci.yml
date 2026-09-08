@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A second push supersedes the first: nothing here is worth finishing for a
+# commit that has already been replaced.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Build, typecheck, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # No `version:` on purpose — `packageManager` in package.json is the one
+      # source of the pnpm version, and setting both makes the action error on
+      # the conflict.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Typecheck
+        # `svelte-check` is separate from `tsc`: it is the only thing that reads
+        # the templates, where most of this app's type errors live.
+        run: pnpm typecheck
+
+      - name: Test
+        # The browser suite skips itself without `MASAX_DATA` and a data tree,
+        # neither of which exists here — the catalogue is Mitsubishi's and is not
+        # in this repository. So this is the unit suite over synthetic fixtures,
+        # and a green run here says nothing about whether the interface works or
+        # whether the format still reads. Those are checked locally with
+        # `masax verify` against real media.
+        run: pnpm test
+
+      - name: Formatting
+        run: pnpm prettier --check .

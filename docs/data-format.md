@@ -374,6 +374,50 @@ is used because it disambiguates, not because the model list is unreliable.
 > model. `VInfo`'s `A2` field does hold a pattern (`PA-PD#`, `L0/P0#`), but it is
 > a human-readable range label, not the join.
 
+### Callout hotspots
+
+The drawings are clickable in the original — `ASA.exe` has a `CHotImageView` —
+and **no `.ddm` declares a coordinate**. The coordinates are in the image, in
+private TIFF tag **`0xfe00`**: declared as an array of LONGs, but really a
+packed blob of records, one per callout label printed on the plate.
+
+| field         | type       | meaning                                        |
+| ------------- | ---------- | ---------------------------------------------- |
+| length        | u16        | bytes in this record, including this field     |
+| x, y          | u16        | top-left of the label box, in image pixels     |
+| width, height | u16        | of the label box; typically ~103 × ~25         |
+| pnc           | u8 + bytes | part-name code the callout points at           |
+| label         | u8 + bytes | the text as printed; usually the same as `pnc` |
+| flags         | u16        | always 1 on the European media                 |
+
+**The declared count under-reports the data.** The blob is written after the
+image strip, at the very end of the file, and the records continue past
+`4 × count`. Reading only the declared length truncates the last callouts on
+**13,653 of the 17,977** drawings — and truncates them mid-record, so the loss
+looks like "this plate has fewer callouts" rather than like an error. Read from
+the tag's offset to the end of the file: nothing follows it.
+
+Measured over every drawing, reading to EOF: **16,938 carry hotspots, 371,928 in
+total**, up to 99 on one plate, with **0 bytes left unparsed** and **0 boxes
+outside the image**. The remaining 1,039 have none, which is what an index page
+looks like.
+
+#### A callout is not always on the plate's own list
+
+Of the 16,332 referenced illustrations, **11,839 are used by more than one
+plate** and one is used by 235. A drawing therefore carries the callouts of
+every variant it serves, plus `REF.` pointers into other groups — a lubrication
+plate carries engine codes like `02093P`. Sampling 120 plates, 3,168 of 3,630
+callouts matched the plate's own parts list and 462 did not.
+
+So a callout is only actionable when its code is on the current parts list. The
+client draws the others — they are printed on the paper — and leaves them inert.
+
+> An earlier version of this document said the drawings had no hotspot data,
+> reasoning from `dsPicPNC.cds` declaring no X/Y fields. The conclusion was
+> drawn from the wrong artifact: `.cds` files describe the application's
+> in-memory grids, not the data on the disc.
+
 ### Illustrations
 
 **The files under `ILLUST/` are named `*.tif` but are not TIFFs as stored.**

@@ -134,6 +134,19 @@ the Pajero I catalogue and simply not the one for that model. **Before
 concluding two code sets are unrelated, check a pair the data says belongs
 together.**
 
+## A tag's declared length can be a lie
+
+Hotspot coordinates live in private TIFF tag `0xfe00`, and **its declared count
+is short**: the blob runs past `4 × count` to the end of the file. Trusting the
+count truncated the last callouts on 13,653 of 17,977 drawings, mid-record, so
+it read as "fewer callouts" rather than as corruption. The check that caught it
+was asking whether the parse consumed every byte — the same check that carries
+`masax verify`.
+
+Related: **`.cds` files are not data.** They describe the application's
+in-memory grids. Concluding from `dsPicPNC.cds` that no hotspot coordinates
+existed was reasoning from the wrong artifact, and it stood for several commits.
+
 ## Case, across sources
 
 Disc A spells the drawings directory `Illust`; disc B spells it `ILLUST`. An

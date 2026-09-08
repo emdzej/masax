@@ -57,10 +57,29 @@ export function deobfuscate(data: Uint8Array): Uint8Array {
 export const obfuscate = deobfuscate;
 
 export interface Ifd {
-  /** Single-valued tags, which is all the drawings use. */
+  /** Single-valued tags. */
   tags: Map<number, number>;
-  /** Multi-valued tags, kept separately so a stray array is not silently read as a scalar. */
+  /** Multi-valued tags, kept separately so a stray array is not read as a scalar. */
   arrays: Map<number, number[]>;
+  /**
+   * Raw payload bytes per tag, as the tag declares them.
+   *
+   * Needed because tag `0xfe00` declares itself an array of LONGs but is really
+   * a packed byte blob — the callout hotspots. Reading it as numbers loses the
+   * record boundaries.
+   */
+  raw: Map<number, Uint8Array>;
+  /**
+   * Where each tag's payload starts in the file.
+   *
+   * Tag `0xfe00` needs this because **its declared count under-reports the
+   * data**: the blob is written after the image strip, at the end of the file,
+   * and the records run past `4 * count`. Reading only the declared length
+   * truncates the last few callouts on 13,653 of the 17,977 drawings — and
+   * truncates them *mid-record*, so a parser that stops there looks like it
+   * simply found fewer hotspots.
+   */
+  offsets: Map<number, number>;
   littleEndian: boolean;
 }
 
@@ -82,6 +101,8 @@ export function readIfd(tiff: Uint8Array): Ifd {
   const count = u16(start);
   const tags = new Map<number, number>();
   const arrays = new Map<number, number[]>();
+  const raw = new Map<number, Uint8Array>();
+  const offsets = new Map<number, number>();
 
   for (let i = 0; i < count; i++) {
     const at = start + 2 + 12 * i;
@@ -102,6 +123,8 @@ export function readIfd(tiff: Uint8Array): Ifd {
       return 0;
     };
 
+    raw.set(tag, tiff.subarray(base, base + size * length));
+    offsets.set(tag, base);
     if (length === 1) {
       tags.set(tag, read(0));
     } else {
@@ -111,7 +134,7 @@ export function readIfd(tiff: Uint8Array): Ifd {
       tags.set(tag, values[0]!);
     }
   }
-  return { tags, arrays, littleEndian: little };
+  return { tags, arrays, raw, offsets, littleEndian: little };
 }
 
 export interface Illustration extends DecodeResult {

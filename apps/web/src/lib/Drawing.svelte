@@ -1,20 +1,31 @@
 <!--
-  A parts plate, and its title block.
+  A parts plate: its drawing, its callout hotspots, and its title block.
 
   The drawings are Group 4 TIFFs behind a byte obfuscation, which no browser
-  will render, so they are decoded here and painted to a canvas.
+  will render, so they are decoded here and painted to a canvas. The callouts
+  come from a private TIFF tag — see `@masax/illust` — and are laid over the
+  canvas as buttons, so clicking a number on the plate selects the part and
+  selecting a part lights up its number.
 
-  Underneath sits a title block. Real engineering drawings carry one — and so do
-  these: every ASA plate prints its own stamp in the corner (`3KC1A02`) and a
-  cross-reference (`REF. 13-020`). Repeating that language in the interface
-  means the drawing id, the group it belongs to and its date window read the way
-  the sheet itself reads, rather than as a caption bolted underneath.
+  A drawing can serve many plates: 11,839 of the 16,332 referenced
+  illustrations are used by more than one, and one is used by 235. So some
+  callouts on a plate belong to a different variant, and some are `REF.`
+  pointers into another group. Those are drawn but not clickable — visible,
+  because they are on the paper, and inert, because they are not on this list.
 -->
 <script lang="ts">
   import ImageOff from "@lucide/svelte/icons/image-off";
   import Maximize2 from "@lucide/svelte/icons/maximize-2";
   import Minimize2 from "@lucide/svelte/icons/minimize-2";
-  import { bitmapToRgba, decodeIllustration } from "@masax/illust";
+  import {
+    HOTSPOT_TAG,
+    bitmapToRgba,
+    decodeIllustration,
+    deobfuscate,
+    hotspotsFromTiff,
+    readIfd,
+    type Hotspot,
+  } from "@masax/illust";
   import { formatAsaDateShort } from "@masax/core";
   import type { AsaCatalogue, GroupRef } from "@masax/catalogue";
 
@@ -22,25 +33,32 @@
     catalogue,
     plate,
     model,
+    /** Part-name codes the current parts list contains. */
+    available = new Set<string>(),
+    /** The code selected in the parts list, highlighted on the plate. */
+    activePnc,
+    onPick,
   }: {
     catalogue: AsaCatalogue | undefined;
     plate: GroupRef | undefined;
     model: string | undefined;
+    available?: Set<string>;
+    activePnc?: string;
+    onPick?: (pnc: string) => void;
   } = $props();
 
+  const PADDING = 8;
+
+  let frame = $state<HTMLDivElement | undefined>(undefined);
   let canvas = $state<HTMLCanvasElement | undefined>(undefined);
   let problem = $state("");
-  let dimensions = $state("");
   let loading = $state(false);
-  /**
-   * Fit to the column, or show the drawing at its own resolution.
-   *
-   * A plate is 960px wide and the callout numbers are small type inside the
-   * image, so any downscaling costs legibility — and reading callouts off the
-   * plate is the whole job. Fit is the default because it shows the whole
-   * assembly at once; actual size is one click away for when a number matters.
-   */
+  let natural = $state({ width: 0, height: 0 });
+  let hotspots = $state<Hotspot[]>([]);
+  /** Fit to the column, or show the plate at its own resolution. */
   let actual = $state(false);
+  /** Displayed size of the image, which the hotspot overlay must match exactly. */
+  let stage = $state({ width: 0, height: 0 });
 
   const name = $derived(plate?.illustration);
 
@@ -51,6 +69,45 @@
     return from || to ? `${from || "?"} – ${to || "?"}` : "";
   });
 
+  const scale = $derived(natural.width > 0 ? stage.width / natural.width : 1);
+
+  /** Size the stage so the overlay lines up with the pixels, in either mode. */
+  function measure(): void {
+    if (!natural.width || !natural.height) return;
+    if (actual) {
+      stage = { width: natural.width, height: natural.height };
+      return;
+    }
+    const box = frame?.getBoundingClientRect();
+    if (!box) return;
+    const room = {
+      width: Math.max(0, box.width - PADDING * 2),
+      height: Math.max(0, box.height - PADDING * 2),
+    };
+    const factor = Math.min(room.width / natural.width, room.height / natural.height);
+    stage = {
+      width: Math.max(1, Math.floor(natural.width * factor)),
+      height: Math.max(1, Math.floor(natural.height * factor)),
+    };
+  }
+
+  $effect(() => {
+    const element = frame;
+    if (!element) return;
+    // The column width changes with the window and with the rail, so the stage
+    // is measured rather than assumed.
+    const observer = new ResizeObserver(() => measure());
+    observer.observe(element);
+    return () => observer.disconnect();
+  });
+
+  $effect(() => {
+    // Re-measure when the mode or the image changes.
+    void actual;
+    void natural;
+    measure();
+  });
+
   $effect(() => {
     const element = canvas;
     const drawing = name;
@@ -58,14 +115,15 @@
 
     let cancelled = false;
     problem = "";
-    dimensions = "";
     loading = true;
+    hotspots = [];
 
     void (async () => {
       try {
         const stored = await catalogue.readIllustration(drawing);
         if (cancelled) return;
         if (!stored) throw new Error("not in this data");
+
         const image = decodeIllustration(stored);
         const context = element.getContext("2d");
         if (!context) throw new Error("no 2d context");
@@ -76,7 +134,13 @@
           0,
           0,
         );
-        dimensions = `${image.width}×${image.height}`;
+
+        const tiff = deobfuscate(stored);
+        const found = hotspotsFromTiff(tiff, readIfd(tiff).offsets.get(HOTSPOT_TAG));
+        if (cancelled) return;
+        natural = { width: image.width, height: image.height };
+        hotspots = found.hotspots;
+        measure();
       } catch (cause) {
         if (!cancelled) problem = (cause as Error).message;
       } finally {
@@ -88,20 +152,41 @@
       cancelled = true;
     };
   });
+
+  const pickable = (spot: Hotspot) => available.has(spot.pnc);
 </script>
 
 <figure class="sheet">
-  <div class="frame" class:empty={!name} class:actual>
+  <div class="frame" bind:this={frame} class:empty={!name} class:actual>
     {#if !name}
       <p class="none">Choose a plate.</p>
     {:else if problem}
       <p class="none"><ImageOff size={16} /> {name}: {problem}</p>
     {/if}
-    <canvas
-      bind:this={canvas}
+
+    <div
+      class="stage"
       class:hidden={!name || Boolean(problem)}
-      aria-label={name ? `Drawing ${name}` : "No plate selected"}
-    ></canvas>
+      style="width:{stage.width}px;height:{stage.height}px"
+    >
+      <canvas bind:this={canvas} aria-label={name ? `Drawing ${name}` : "No plate selected"}
+      ></canvas>
+      {#each hotspots as spot, i (`${spot.pnc}-${spot.x}-${spot.y}-${i}`)}
+        {@const live = pickable(spot)}
+        <button
+          class="spot"
+          class:live
+          class:on={live && spot.pnc === activePnc}
+          disabled={!live}
+          title={live ? `${spot.label} — select this part` : `${spot.label} — not on this list`}
+          aria-label={`Callout ${spot.label}`}
+          onclick={() => live && onPick?.(spot.pnc)}
+          style="left:{spot.x * scale}px;top:{spot.y * scale}px;width:{spot.width *
+            scale}px;height:{spot.height * scale}px"
+        ></button>
+      {/each}
+    </div>
+
     {#if name && !problem}
       <button
         class="zoom"
@@ -133,7 +218,13 @@
         <span class="label">Drawing</span>
         <span class="value code nowrap">{name ?? "—"}</span>
         <span class="sub code">
-          {#if loading}decoding…{:else if dimensions}{dimensions}{/if}
+          {#if loading}
+            decoding…
+          {:else if natural.width}
+            {natural.width}×{natural.height}{hotspots.length
+              ? ` · ${hotspots.length} callouts`
+              : ""}
+          {/if}
         </span>
       </div>
     </figcaption>
@@ -145,6 +236,11 @@
     margin: 0;
     display: flex;
     flex-direction: column;
+    /*
+     * Stretches to its column, and that is load-bearing: with a content-based
+     * height there is no definite height to fit the drawing into.
+     */
+    min-height: 0;
     min-width: 0;
     background: var(--sheet);
     border: 1px solid var(--rule);
@@ -153,18 +249,73 @@
   }
   .frame {
     position: relative;
-    padding: 0.5rem;
     display: grid;
     place-items: center;
-    min-height: 12rem;
+    /* Takes the space the title block does not, and no more. */
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
   }
+  .frame.empty {
+    min-height: 16rem;
+  }
+  /* Actual size scrolls inside the frame, so the title block stays put. */
   .frame.actual {
     place-items: start;
     overflow: auto;
-    max-height: 78vh;
+    padding: 0.5rem;
   }
-  .frame.actual canvas {
-    max-width: none;
+
+  /*
+   * The stage is sized in script to the displayed pixels, so a hotspot at
+   * (x, y) lands on the number printed at (x, y). Letting CSS letterbox the
+   * canvas instead would leave the overlay guessing where the image starts.
+   */
+  .stage {
+    position: relative;
+    flex: none;
+  }
+  .stage.hidden {
+    display: none;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .spot {
+    position: absolute;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 1px;
+    background: none;
+  }
+  .spot.live:hover {
+    border-color: var(--red);
+    background: color-mix(in srgb, var(--red) 12%, transparent);
+  }
+  .spot.on {
+    border-color: var(--red);
+    background: color-mix(in srgb, var(--red) 20%, transparent);
+    box-shadow: 0 0 0 1px var(--red);
+  }
+  .spot:disabled {
+    cursor: default;
+  }
+
+  .none {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0 1rem;
+    text-align: center;
+    color: var(--steel);
+    font-size: 12px;
   }
   .zoom {
     position: absolute;
@@ -181,29 +332,9 @@
     border-color: var(--red);
     color: var(--red);
   }
-  .frame.empty {
-    min-height: 16rem;
-  }
-  canvas {
-    max-width: 100%;
-    height: auto;
-    display: block;
-  }
-  .hidden {
-    display: none;
-  }
-  .none {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    margin: 0;
-    color: var(--steel);
-    font-size: 12px;
-  }
 
-  /* The title block: hairline-separated cells, mono values, borrowed from the
-     stamp the drawings already print in their own corner. */
   .block {
+    flex: none;
     display: grid;
     grid-template-columns: minmax(0, 1.5fr) auto auto;
     border-top: 1px solid var(--rule);

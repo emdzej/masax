@@ -1,0 +1,110 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Deliberately not cancel-in-progress: a half-finished deploy would leave the
+# site in whatever state the cancelled run reached. Queueing is right for a
+# publish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Work out the base path
+        id: base
+        # `base` is baked in at build time and a build cannot be relocated
+        # afterwards, so this has to be decided here and has to be right.
+        #
+        # `apps/web/public/CNAME` is the signal, because it is the same file
+        # GitHub reads to keep the custom domain attached — one fact, one place.
+        # A fork with no CNAME still gets a working prefixed build.
+        run: |
+          set -euo pipefail
+          if [ -f apps/web/public/CNAME ]; then
+            echo "path=/" >> "$GITHUB_OUTPUT"
+            echo "custom domain $(cat apps/web/public/CNAME) — building for the root"
+          else
+            echo "path=/${{ github.event.repository.name }}/" >> "$GITHUB_OUTPUT"
+            echo "no CNAME — building for /${{ github.event.repository.name }}/"
+          fi
+
+      - name: Build the web app
+        env:
+          BASE_PATH: ${{ steps.base.outputs.path }}
+        run: pnpm --filter @masax/web build
+
+      # The deployed site ships **no catalogue data**, deliberately: the
+      # catalogue and the drawings are Mitsubishi's and are not ours to
+      # redistribute. That works because a visitor points the app at their own
+      # discs, so a fresh visit lands on the data-location panel.
+      - name: Check the build is self-contained and correctly based
+        run: |
+          set -euo pipefail
+          BASE='${{ steps.base.outputs.path }}'
+          test -f apps/web/dist/index.html
+
+          # The failure this catches is nasty because index.html still returns
+          # 200: the page loads and every asset 404s. Shipping a /masax/ build
+          # to a root domain does exactly that.
+          if ! grep -q "src=\"${BASE}assets/" apps/web/dist/index.html; then
+            echo "index.html does not reference assets under ${BASE}:" >&2
+            grep -oE '(src|href)="[^"]*assets[^"]*"' apps/web/dist/index.html >&2
+            exit 1
+          fi
+          echo "assets are referenced under ${BASE}"
+
+          # The version is injected from package.json at build time, so a stale
+          # or missing one means the About dialog and the release link are wrong.
+          VERSION=$(node -p "require('./package.json').version")
+          if ! grep -q "$VERSION" apps/web/dist/assets/*.js; then
+            echo "version $VERSION is not in the bundle" >&2
+            exit 1
+          fi
+          echo "version in bundle: $VERSION"
+
+          # A CNAME in the artifact is what keeps the custom domain attached.
+          if [ -f apps/web/public/CNAME ]; then
+            test -f apps/web/dist/CNAME
+            echo "CNAME deployed: $(cat apps/web/dist/CNAME)"
+          fi
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

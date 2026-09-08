@@ -21,7 +21,29 @@
   import type { GroupRef, PartRow } from "@masax/catalogue";
   import { formatAsaDateShort } from "@masax/core";
 
-  let { parts, plate }: { parts: PartRow[]; plate?: GroupRef } = $props();
+  let {
+    parts,
+    plate,
+    activePnc,
+    onSelect,
+  }: {
+    parts: PartRow[];
+    plate?: GroupRef;
+    /** Linked callout, set from here or from the drawing. */
+    activePnc?: string;
+    onSelect?: (pnc: string) => void;
+  } = $props();
+
+  let body = $state<HTMLTableSectionElement | undefined>(undefined);
+
+  // When the drawing picks a callout the row may be far down a list of ninety,
+  // so bring it into view rather than leaving the user to hunt for it.
+  $effect(() => {
+    const code = activePnc;
+    if (!code || !body) return;
+    const row = body.querySelector<HTMLElement>(`[data-pnc="${CSS.escape(code)}"]`);
+    row?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  });
 
   const dates = (row: PartRow) => {
     const from = formatAsaDateShort(row.startDate);
@@ -67,9 +89,14 @@
             <th class="label">Applies</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody bind:this={body}>
           {#each parts as part, i (`${part.pnc}-${part.partNumber}-${i}`)}
-            <tr class:group-start={firstOfCode[i] && i > 0}>
+            <tr
+              data-pnc={part.pnc}
+              class:group-start={firstOfCode[i] && i > 0}
+              class:linked={part.pnc === activePnc}
+              onclick={() => onSelect?.(part.pnc)}
+            >
               <td class="code pnc">{firstOfCode[i] ? part.pnc : ""}</td>
               <td class="code part">{part.partNumber ?? ""}</td>
               <td class="code num">{part.quantity ?? ""}</td>
@@ -104,8 +131,8 @@
     <footer>
       <Info size={12} />
       <span>
-        Every part on the plate is listed. Conditions are shown, not applied — how ASA
-        combines them is not established.
+        Click a row or a callout on the plate to link the two. Every part is listed;
+        conditions are shown, not applied — how ASA combines them is not established.
       </span>
     </footer>
   {/if}
@@ -115,6 +142,10 @@
   .panel {
     display: flex;
     flex-direction: column;
+    /* Fills the column and scrolls its own body, so the drawing beside it
+       stays put. */
+    max-height: 100%;
+    min-height: 0;
     min-width: 0;
     background: var(--sheet);
     border: 1px solid var(--rule);
@@ -142,7 +173,9 @@
   }
 
   .scroll {
-    overflow-x: auto;
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
   }
   table {
     border-collapse: collapse;
@@ -163,8 +196,19 @@
     border-bottom: 1px solid var(--rule-soft);
     vertical-align: top;
   }
+  tbody tr {
+    cursor: pointer;
+  }
   tbody tr:hover td {
     background: var(--shade);
+  }
+  /* Linked to the callout showing on the drawing. */
+  tbody tr.linked td {
+    background: var(--red-wash);
+  }
+  tbody tr.linked .pnc {
+    color: var(--red-deep);
+    font-weight: 600;
   }
   /* A new part-name code starts a new callout, so give it a visible edge. */
   tr.group-start td {

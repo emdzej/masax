@@ -160,6 +160,32 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
     expect(ink).toBeLessThan(960 * 1210 * 0.5);
   });
 
+  it("links a callout on the plate to its row, and back", async () => {
+    // The coordinates come from a private TIFF tag; see @masax/illust. A
+    // drawing can serve many plates, so callouts that are not on this list are
+    // drawn but inert.
+    const spots = page.locator("button.spot");
+    await expect.poll(() => spots.count(), { timeout: 30_000 }).toBeGreaterThan(10);
+    const live = page.locator("button.spot.live");
+    expect(await live.count()).toBeGreaterThan(0);
+    expect(await live.count()).toBeLessThanOrEqual(await spots.count());
+
+    await live.first().click();
+    const linked = page.locator("tbody tr.linked");
+    await expect.poll(() => linked.count(), { timeout: 10_000 }).toBeGreaterThan(0);
+    // The callout the user clicked is marked; a code used in several places
+    // marks all of them, which is the point.
+    expect(await page.locator("button.spot.on").count()).toBeGreaterThan(0);
+
+    const code = (await linked.first().getAttribute("data-pnc")) ?? "";
+    expect(code).not.toBe("");
+    expect(await live.first().getAttribute("aria-label")).toContain(code);
+
+    // Clicking the row again unlinks it.
+    await linked.first().click();
+    await expect.poll(() => page.locator("tbody tr.linked").count()).toBe(0);
+  });
+
   it("filters the group list by number and by name", async () => {
     const groups = page.locator("section.rail").first();
     const before = await groups.locator("button.row").count();
