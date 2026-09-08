@@ -16,7 +16,15 @@ vehicle it does not fit, and nothing in a passing test run will tell you.
 ```sh
 pnpm check                              # build, typecheck, unit tests
 masax verify <a merged media tree>/M60
+MASAX_DATA=<the same tree> pnpm test    # and the browser suite
 ```
+
+`pnpm check` **skips the browser suite** unless `MASAX_DATA` is set, and skipped
+tests are reported as passes. It is the only place the range reads, the canvas
+and the theme are exercised in a real browser, and it has caught things every
+unit test agreed with — an unbound `fetch` throwing `Illegal invocation` is not
+reproducible in Node. `MASAX_DATA` takes a module directory or one holding a
+module, so either `/Volumes/data/masax` or `/Volumes/data/masax/M60`.
 
 Expect `9495097 records decode exactly, 1889570 of them reachable through an
 index`. **Anything less is a regression**, not an acceptable margin — the format

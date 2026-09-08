@@ -2,21 +2,54 @@
  * The whole chain in a real browser: HTTP `Range` -> engine -> catalogue ->
  * Group 4 decode -> canvas and parts table.
  *
- * Gated on `MASAX_DATA` pointing at an ASA module directory, because no data
- * lives in this repository. Without it the suite skips.
+ * Gated on `MASAX_DATA`, because no data lives in this repository. Without it
+ * the suite skips. It may name a module directory or a directory holding one:
+ * `/Volumes/data/masax` and `/Volumes/data/masax/M60` both work.
  *
  * The static server here answers `Range` properly on purpose: a host that
  * ignores it and returns 200 with the whole body would make every read return
  * the wrong bytes, and `HttpRangeReader` is written to reject that rather than
  * trust it. This test is also what proves the range path works at all.
  */
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { createReadStream, existsSync, readdirSync, statSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { extname, join, normalize } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const DATA = process.env["MASAX_DATA"];
 const DIST = new URL("../dist/", import.meta.url).pathname;
+
+/** A module root is the directory with an `EPC` in it. Spelling varies by disc. */
+const isModuleRoot = (dir: string): boolean => {
+  try {
+    return readdirSync(dir).some((entry) => entry.toLowerCase() === "epc");
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * The URL path the client should be pointed at, under the served `/data/`.
+ *
+ * `MASAX_DATA` may name the module directory itself or a directory holding one,
+ * because both are reasonable readings and only one of them used to work.
+ * Pointing at the module root produced a 404 on the manifest and an error about
+ * the tree not being a data tree — which blames the data rather than the
+ * variable, and cost real time.
+ */
+function modulePath(root: string): string {
+  if (isModuleRoot(root)) return "/data/";
+  const modules = readdirSync(root, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && isModuleRoot(join(root, entry.name)))
+    .map((entry) => entry.name);
+  if (modules.length !== 1) {
+    throw new Error(
+      `MASAX_DATA=${root} holds ${modules.length} module directories, expected one` +
+        `${modules.length ? `: ${modules.join(", ")}` : ""}`,
+    );
+  }
+  return `/data/${modules[0]}/`;
+}
 
 const TYPES: Record<string, string> = {
   ".html": "text/html",
@@ -97,7 +130,7 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
     // The picked-directory path is the primary one and needs a real gesture
     // against a real folder, so the browser test drives the HTTP fallback. On a
     // first run the settings panel is already open and asking.
-    await page.getByPlaceholder(/example\.org/).fill(`${base}/data/M60/`);
+    await page.getByPlaceholder(/example\.org/).fill(`${base}${modulePath(DATA!)}`);
     await page.getByRole("button", { name: "Open", exact: true }).click();
     try {
       await page.locator("select#catalogue").waitFor({ timeout: 90_000 });
