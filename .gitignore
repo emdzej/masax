@@ -16,3 +16,6 @@ build/
 *.tsbuildinfo
 __pycache__/
 *.pyc
+
+# macOS writes these into every directory it displays.
+.DS_Store
