@@ -9,11 +9,31 @@
  * Text sits at #1C1C1E rather than black on purpose: the drawings are 1-bit
  * line art in pure black, and the interface should read as one step back from
  * the sheet rather than competing with it.
+ *
+ * The palette is defined three times over, and the order matters. Bare `:root`
+ * is light and complete — every token gets its value there, so nothing depends
+ * on a media query having matched. `prefers-color-scheme: dark` then overrides
+ * the tokens, guarded by `:not([data-theme="light"])` so an explicit light
+ * choice wins on a dark machine. `[data-theme="dark"]` overrides them again so
+ * an explicit dark choice wins on a light one. The auto state writes no
+ * attribute at all: see `theme.svelte.ts`.
  */
 :root {
+  color-scheme: light;
+
   --red: #e60012;
   --red-deep: #a3000d;
   --red-wash: #fdecee;
+  /* Text on an accent-filled surface. It flips with the accent: the dark
+     theme's red is light enough that white on it fails contrast. */
+  --on-red: #ffffff;
+  /* Dialog scrim and panel shadow. These need their own tokens rather than a
+     wash of `--ink`: ink is the *text* colour, so it flips to near-white in
+     dark and a scrim built from it lightens the page instead of dimming it.
+     The dark scrim is also stronger, because the panel it separates from the
+     page is itself dark. */
+  --scrim: rgb(20 21 23 / 42%);
+  --drop: rgb(20 21 23 / 35%);
 
   --ink: #1c1c1e;
   --steel: #6b6f76;
@@ -31,6 +51,63 @@
   /* An engineering drawing has no soft corners. Two radii, both nearly nothing. */
   --r: 2px;
   --r-lg: 3px;
+}
+
+/*
+ * Dark. The red has to move: #E60012 on a dark ground is a vibrating,
+ * hard-to-read red, so the accent lightens to #FF4D5A while the deep variant
+ * becomes the *brighter* of the pair — on dark, "deeper" means hotter, because
+ * a hover that darkens toward the background reads as disabled.
+ *
+ * The greys are the light ramp turned over rather than inverted arithmetically:
+ * the sheet stays a step above the panel so a plate still reads as paper laid
+ * on a desk, and the rules stay quiet enough not to draw a grid over a
+ * drawing.
+ */
+@media (prefers-color-scheme: dark) {
+  /* Guarded, so an explicit light choice still wins on a dark machine. */
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --red: #ff4d5a;
+    --red-deep: #ff7c86;
+    --red-wash: #2e1418;
+    --on-red: #1a0a0c;
+    --scrim: rgb(0 0 0 / 62%);
+    --drop: rgb(0 0 0 / 55%);
+
+    --ink: #dee2e7;
+    --steel: #949aa3;
+    --steel-light: #6d747d;
+
+    --rule: #34383e;
+    --rule-soft: #262a2f;
+    --panel: #101215;
+    --sheet: #17191c;
+    --shade: #1c1f23;
+  }
+}
+
+/* An explicit dark choice, which must also win on a light machine. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --red: #ff4d5a;
+  --red-deep: #ff7c86;
+  --red-wash: #2e1418;
+  --on-red: #1a0a0c;
+  --scrim: rgb(0 0 0 / 62%);
+  --drop: rgb(0 0 0 / 55%);
+
+  --ink: #dee2e7;
+  --steel: #949aa3;
+  --steel-light: #6d747d;
+
+  --rule: #34383e;
+  --rule-soft: #262a2f;
+  --panel: #101215;
+  --sheet: #17191c;
+  --shade: #1c1f23;
 }
 
 * {

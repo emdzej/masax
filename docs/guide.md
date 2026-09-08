@@ -177,6 +177,18 @@ drawing stays put.
 - The icon in the drawing's top-right corner switches between **fit to the
   column** and **actual size**. At actual size, drag the drawing to pan it.
 
+### Light and dark
+
+The two controls at the right of the toolbar are the theme and the settings cog.
+The theme cycles **auto → light → dark**; auto follows the machine and keeps
+following it, so a desk that switches at sunset switches with it. The choice is
+remembered.
+
+In dark, the drawing is painted light-on-dark rather than left as a white
+rectangle — it is the largest thing on screen and would undo the theme on its
+own. The plate is repainted from the decoded bitmap, so the callout highlights
+stay red rather than being inverted along with everything else.
+
 ### What the parts table says
 
 | Column      | Meaning                                                 |

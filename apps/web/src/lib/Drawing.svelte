@@ -16,6 +16,13 @@
   At actual size the drawing is larger than its column, so the frame scrolls and
   can be dragged. A drag that crosses a callout must not select it, so a click
   is swallowed once the pointer has travelled far enough to be a pan.
+
+  In dark mode the plate is painted light-on-dark rather than left as a white
+  rectangle. A 960x1210 sheet of pure white is the largest thing on screen and
+  would undo the theme on its own. It is a repaint, not a CSS filter: the
+  decoder hands back a 1-bit bitmap and `bitmapToRgba` already takes the two
+  colours, so the drawing is simply painted in the theme's ink and paper. A
+  filter would also invert the callout highlights.
 -->
 <script lang="ts">
   import { tick } from "svelte";
@@ -26,12 +33,14 @@
     HOTSPOT_TAG,
     bitmapToRgba,
     decodeIllustration,
+    type Bitmap,
     deobfuscate,
     hotspotsFromTiff,
     readIfd,
     type Hotspot,
   } from "@masax/illust";
   import { formatAsaDateShort } from "@masax/core";
+  import { theme } from "./theme.svelte";
   import type { AsaCatalogue, GroupRef } from "@masax/catalogue";
 
   let {
@@ -67,6 +76,13 @@
 
   /** True while a drag is panning the frame, which also suppresses the click. */
   let panning = $state(false);
+
+  /**
+   * The decoded bitmap, held so a theme change is a repaint rather than a
+   * re-read: the file is up to a megabyte and the Group 4 decode is the
+   * expensive part of opening a plate.
+   */
+  let bitmap = $state<Bitmap | undefined>(undefined);
 
   const name = $derived(plate?.illustration);
 
@@ -125,6 +141,7 @@
     problem = "";
     loading = true;
     hotspots = [];
+    bitmap = undefined;
 
     void (async () => {
       try {
@@ -133,21 +150,12 @@
         if (!stored) throw new Error("not in this data");
 
         const image = decodeIllustration(stored);
-        const context = element.getContext("2d");
-        if (!context) throw new Error("no 2d context");
-        element.width = image.width;
-        element.height = image.height;
-        context.putImageData(
-          new ImageData(bitmapToRgba(image), image.width, image.height),
-          0,
-          0,
-        );
-
         const tiff = deobfuscate(stored);
         const found = hotspotsFromTiff(tiff, readIfd(tiff).offsets.get(HOTSPOT_TAG));
         if (cancelled) return;
         natural = { width: image.width, height: image.height };
         hotspots = found.hotspots;
+        bitmap = image;
         measure();
       } catch (cause) {
         if (!cancelled) problem = (cause as Error).message;
@@ -220,6 +228,24 @@
     frame.scrollLeft = (frame.scrollWidth - frame.clientWidth) / 2;
     frame.scrollTop = (frame.scrollHeight - frame.clientHeight) / 2;
   }
+
+  $effect(() => {
+    // Depends on the bitmap and on the theme, so switching to dark repaints the
+    // plate already on screen without touching the disc.
+    const image = bitmap;
+    const element = canvas;
+    const { ink, paper } = theme.surface;
+    if (!image || !element) return;
+    const context = element.getContext("2d");
+    if (!context) return;
+    element.width = image.width;
+    element.height = image.height;
+    context.putImageData(
+      new ImageData(bitmapToRgba(image, { black: ink, white: paper }), image.width, image.height),
+      0,
+      0,
+    );
+  });
 
   const pickable = (spot: Hotspot) => available.has(spot.pnc);
 </script>

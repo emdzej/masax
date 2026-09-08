@@ -96,6 +96,11 @@ screen. Group and plate are filterable lists on the left, matching on the number
 as well as the name, because the number is often what you already know. The
 drawing gets the larger share of the width, with the parts beside it.
 
+Light and dark, with a third state that follows the system and keeps following
+it. Dark repaints the plate light-on-dark from the decoded bitmap rather than
+filtering it — a 960x1210 white rectangle is the largest thing on screen, and a
+CSS filter would invert the callout highlights with it.
+
 The drawings are Group 4 TIFFs behind a byte obfuscation, so they are decoded in
 the browser rather than converted first — which is what lets the app read a disc
 directly and a static host serve the vendor's own files unchanged.

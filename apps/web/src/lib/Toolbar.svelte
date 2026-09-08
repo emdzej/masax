@@ -8,11 +8,15 @@
   stays on screen while you work, which is what a parts desk actually needs.
 -->
 <script lang="ts">
-  import Settings2 from "@lucide/svelte/icons/settings-2";
+  import Cog from "@lucide/svelte/icons/cog";
+  import Monitor from "@lucide/svelte/icons/monitor";
+  import Moon from "@lucide/svelte/icons/moon";
+  import Sun from "@lucide/svelte/icons/sun";
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import Diamond from "./Diamond.svelte";
   import GithubMark from "./GithubMark.svelte";
   import { REPOSITORY, VERSION, releaseUrl } from "./build";
+  import { THEME_LABEL, theme } from "./theme.svelte";
   import { formatAsaDate } from "@masax/core";
   import type { CatalogueInfo, VehicleCatalogue, VinRecord } from "@masax/catalogue";
 
@@ -125,9 +129,28 @@
     </select>
   </div>
 
-  <button class="icon" onclick={onSettings} aria-label="Data location and settings">
-    <Settings2 size={15} />
-  </button>
+  <!--
+    Pushed to the far right by `.tools`, away from the fields: these two are
+    chrome, not part of identifying a car, and the eye should skip them while
+    working. The theme sits left of the cog because the cog is the one people
+    reach for by muscle memory, so it keeps the corner.
+  -->
+  <div class="tools">
+    <button class="icon" onclick={() => theme.cycle()} title={THEME_LABEL[theme.choice]}>
+      <!--
+        The icon shows the *current* state rather than the next one. A monitor
+        for auto, because auto is "whatever that screen says"; and the label
+        carries the detail, since three states cannot be read off one glyph.
+      -->
+      {#if theme.choice === "auto"}<Monitor size={15} />
+      {:else if theme.choice === "light"}<Sun size={15} />
+      {:else}<Moon size={15} />{/if}
+      <span class="sr">{THEME_LABEL[theme.choice]}. Click to change.</span>
+    </button>
+    <button class="icon" onclick={onSettings} aria-label="Data location and settings">
+      <Cog size={15} />
+    </button>
+  </div>
 </header>
 
 {#if vehicle || vinError}
@@ -174,6 +197,24 @@
     padding: 0.5rem 0.75rem 0.45rem;
     background: var(--sheet);
     border-bottom: 2px solid var(--red);
+  }
+  /* Takes the slack, so the two controls sit against the right edge however
+     wide the window is. */
+  .tools {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+    margin-left: auto;
+    padding-bottom: 0.1rem;
+  }
+  /* Present for a screen reader, absent for everyone else. */
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   .brand {
     display: flex;
@@ -263,7 +304,7 @@
     border: 1px solid var(--red);
     border-radius: var(--r);
     background: var(--red);
-    color: #fff;
+    color: var(--on-red);
     font-size: 12px;
     font-weight: 600;
     padding: 0.28rem 0.6rem;

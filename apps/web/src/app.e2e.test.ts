@@ -260,6 +260,53 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
     await expect.poll(() => page.locator(".frame.actual").count()).toBe(0);
   });
 
+  it("cycles the theme, remembers it, and repaints the plate", async () => {
+    const button = page.locator(".tools button.icon").first();
+    const attribute = () =>
+      page.evaluate(() => document.documentElement.getAttribute("data-theme"));
+    // The paper of the plate, read off the canvas rather than the CSS: the
+    // drawing is painted, so a theme that only changed the chrome would leave
+    // the largest thing on screen unchanged.
+    const paper = () =>
+      page.evaluate(() => {
+        const context = document.querySelector("canvas")!.getContext("2d")!;
+        const [r, g, b] = context.getImageData(2, 2, 1, 1).data;
+        return [r, g, b] as [number, number, number];
+      });
+
+    // Auto writes no attribute — its absence *is* the auto state.
+    expect(await attribute()).toBeNull();
+    const light = await paper();
+    expect(Math.min(...light)).toBeGreaterThan(200);
+
+    await button.click();
+    expect(await attribute()).toBe("light");
+
+    await button.click();
+    expect(await attribute()).toBe("dark");
+    await expect.poll(async () => Math.max(...(await paper()))).toBeLessThan(60);
+
+    await button.click();
+    expect(await attribute()).toBeNull();
+    await expect.poll(async () => Math.min(...(await paper()))).toBeGreaterThan(200);
+
+    // Remembered, so the next visit opens in the same theme.
+    await button.click();
+    expect(await page.evaluate(() => localStorage.getItem("masax.theme.v1"))).toBe("light");
+    await button.click();
+    await button.click();
+    expect(await attribute()).toBeNull();
+  });
+
+  it("keeps the settings cog against the right edge of the toolbar", async () => {
+    const bar = (await page.locator("header.bar").boundingBox())!;
+    const cog = (await page.locator(".tools button.icon").last().boundingBox())!;
+    expect(bar.x + bar.width - (cog.x + cog.width)).toBeLessThan(20);
+    // and the theme control sits to its left, not the other way round
+    const swatch = (await page.locator(".tools button.icon").first().boundingBox())!;
+    expect(swatch.x).toBeLessThan(cog.x);
+  });
+
   it("filters the group list by number and by name", async () => {
     const groups = page.locator("section.rail").first();
     const before = await groups.locator("button.row").count();

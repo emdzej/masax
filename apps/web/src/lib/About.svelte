@@ -61,7 +61,7 @@
   .scrim {
     position: fixed;
     inset: 0;
-    background: color-mix(in srgb, var(--ink) 42%, transparent);
+    background: var(--scrim);
     display: grid;
     place-items: center;
     padding: 1.5rem;
@@ -81,7 +81,7 @@
     border: 1px solid var(--rule);
     border-top: 2px solid var(--red);
     border-radius: var(--r-lg);
-    box-shadow: 0 12px 40px -12px color-mix(in srgb, var(--ink) 35%, transparent);
+    box-shadow: 0 12px 40px -12px var(--drop);
   }
   header {
     display: flex;

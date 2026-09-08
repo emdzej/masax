@@ -232,7 +232,7 @@
   .scrim {
     position: fixed;
     inset: 0;
-    background: color-mix(in srgb, var(--ink) 42%, transparent);
+    background: var(--scrim);
     display: grid;
     place-items: center;
     padding: 1.5rem;
@@ -255,7 +255,7 @@
     border: 1px solid var(--rule);
     border-top: 2px solid var(--red);
     border-radius: var(--r-lg);
-    box-shadow: 0 12px 40px -12px color-mix(in srgb, var(--ink) 35%, transparent);
+    box-shadow: 0 12px 40px -12px var(--drop);
   }
 
   header {
@@ -453,12 +453,24 @@
   .primary {
     border-color: var(--red);
     background: var(--red);
-    color: #fff;
+    color: var(--on-red);
     font-weight: 600;
   }
   .primary:hover:not(:disabled) {
     background: var(--red-deep);
     border-color: var(--red-deep);
+  }
+  /*
+   * Neutral rather than a dimmed accent. The generic `opacity: 0.45` over a
+   * filled red leaves dark-on-dim-salmon, which is unreadable on the dark
+   * panel; a flat grey says "not available" in both themes.
+   */
+  .primary:disabled {
+    opacity: 1;
+    border-color: var(--rule);
+    background: var(--rule-soft);
+    color: var(--steel-light);
+    font-weight: 600;
   }
   .primary:disabled {
     background: var(--rule-soft);
