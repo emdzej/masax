@@ -344,11 +344,12 @@ export class AppState {
     this.selectedPlate = plate;
     this.busy = "Reading the parts…";
     try {
-      this.parts = await this.catalogue.partsFor(
+      this.parts = await this.catalogue.partsForPlate(
         this.selectedCatalogue,
         this.selectedModel,
         plate.mainGroup,
         plate.subGroup ?? 0,
+        plate.illustration,
       );
       this.remember();
     } catch (cause) {

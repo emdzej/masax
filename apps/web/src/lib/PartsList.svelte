@@ -131,8 +131,8 @@
     <footer>
       <Info size={12} />
       <span>
-        Click a row or a callout on the plate to link the two. Every part is listed;
-        conditions are shown, not applied — how ASA combines them is not established.
+        Click a row or a callout on the plate to link the two. The list is this plate's
+        drawing; dates and codes are shown, not applied to the vehicle.
       </span>
     </footer>
   {/if}

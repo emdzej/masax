@@ -22,7 +22,7 @@
       <Diamond size={11} />
       <h2>masa<span class="x">x</span></h2>
       <a class="version code" href={releaseUrl()} target="_blank" rel="noreferrer noopener">
-        v{VERSION}
+        {VERSION}
       </a>
       <div class="spacer"></div>
       <button class="icon" onclick={onClose} aria-label="Close"><X size={15} /></button>

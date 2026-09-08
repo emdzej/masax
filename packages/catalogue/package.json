@@ -21,6 +21,7 @@
   "dependencies": {
     "@emdzej/csfs-core": "^0.1.0",
     "@masax/core": "workspace:*",
+    "@masax/illust": "workspace:*",
     "@masax/lex": "workspace:*"
   },
   "devDependencies": {

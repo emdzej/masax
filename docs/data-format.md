@@ -290,6 +290,27 @@ so its records are counted twice in that total.
 PartNumber, Qty, SupplyCondition, OPC, DescTs, Classification[100],
 ApplicableCodes[1000]`.
 
+### Language coverage is partial
+
+`Desc` exists once per language and every one of the four holds the same 48,549
+serials, so a language switch is one different file and nothing else. The
+_content_ is another matter. Against `DESC_GB`:
+
+| Language | Translated     | Still English  | Empty         |
+| -------- | -------------- | -------------- | ------------- |
+| `D`      | 12,551 (25.9%) | 35,684 (73.5%) | 314 (0.6%)    |
+| `F`      | 15,181 (31.3%) | 33,054 (68.1%) | 314 (0.6%)    |
+| `J`      | 29,843 (61.5%) | 12,269 (25.3%) | 6,437 (13.3%) |
+
+So a German session legitimately shows English group and plate headings over
+German part names — `21417` is `FUEL TANK` in both `DESC_GB` and `DESC_D`, while
+`DESC_F` has `RESERVOIR DE CARBURANT`. Worth knowing before hunting for a bug in
+the text resolver.
+
+`DESC_J` is **not Latin-1**: its 29,635 non-ASCII strings are half-width katakana
+in the single-byte `0xa1`–`0xdf` range, i.e. JIS X 0201. Decoding it as Latin-1
+— which is correct for the other three — produces mojibake.
+
 ### Dates
 
 `StartDate`/`EndDate` are integers of the form **`YYYYMMT`**, where `T` is a
@@ -373,6 +394,44 @@ is used because it disambiguates, not because the model list is unreliable.
 > `B6037609A`, which is the Pajero I catalogue and simply not the one for that
 > model. `VInfo`'s `A2` field does hold a pattern (`PA-PD#`, `L0/P0#`), but it is
 > a human-readable range label, not the join.
+
+### The parts table does not key to a plate
+
+`catalog` keys to `Model, MainGroup, SubGroup`. `BGroup` keys to
+`Catalog, Model, MainGroup` and carries a `SubGroup` — and **a subgroup number
+can carry several plates**. On `V25W`, `13-010` is three: a filler pipe and two
+tank-and-tube variants. All three read the same 70 rows over 47 codes, because
+that is the only granularity the parts table has.
+
+What separates them is not in `BGroup`. Those three records differ in exactly
+two fields, `TSDesc` and `Illustration`:
+
+```
+{"sub":"010","ts":21417,"tsd":1872,"ill":"113_0103KC1B5T"}   FUEL FILLER PIPE
+{"sub":"010","ts":21417,"tsd":1896,"ill":"113_0103KC1N5T"}   FUEL TANK & FILLER TUBE '94MODEL-
+{"sub":"010","ts":21417,"tsd":1889,"ill":"113_0103KC1U5T"}   FUEL TANK & FILLER TUBE (75L) '95MODEL-
+```
+
+No date window, no classification, no OPC. **The drawing is the discriminator:
+its callouts are its share of the list.** For that subgroup the three drawings
+call out 11, 33 and 29 codes, and their union is exactly the 47 the run holds.
+
+Measured over all 60,698 plates: **733,228 of 735,274** subgroup codes appear on
+some drawing of their subgroup, so the rule accounts for **99.72%**, and it
+halves a plate's list — 1,685,164 codes down to 944,471.
+
+Two cases need an escape hatch, because losing a real part is worse than showing
+a spare one:
+
+- **A drawing with no callouts implies nothing.** 2,160 plates have none; show
+  the whole run.
+- **A code on no drawing of the subgroup stays on every plate of it.** That is
+  the other 0.28%, 2,046 codes — real parts that no image calls out. Filtering
+  them against a drawing would hide them everywhere at once.
+
+This is the plate↔parts join, not vehicle applicability. Narrowing the surviving
+rows to one _vehicle_ — by build date, OPC and classification — is a further
+step and is [still unresolved](#what-is-not-established).
 
 ### Callout hotspots
 
@@ -566,6 +625,26 @@ snapshot dated 2008-09-19, not the result of running the chain, so their bytes
 differ from an updated tree even where the logical content agrees. The update
 packages on disc A exist to bring _older installations_ forward; they are not a
 patch series for the media itself.
+
+## What is not established
+
+Everything above is derived from the data and checked by `masax verify`. Two
+things are not, and are deliberately left un-guessed rather than approximated:
+
+**Vehicle applicability inside a plate.** After the drawing narrows a plate to
+its own codes, several rows can remain for one code — `05014` has three, each
+with its own date window — and rows carry `OPC`, `Classification[100]` and
+`ApplicableCodes[1000]`. A decoded VIN gives a build date, an OPC and a
+classification, so the ingredients are all present. What is not known is how ASA
+_combines_ them: whether the tests are conjunctive, whether an empty
+classification means "all" or "unknown", and what `ApplicableCodes` indexes. The
+client therefore shows every surviving row with its conditions visible, and
+applies none of them. Settling it needs a vehicle whose correct parts list is
+known from outside the data — a printed microfiche page, or the original
+application's own output for a specific VIN.
+
+**`ApplicableCodes` semantics.** An array of up to 1,000 `u16` on a part row. It
+is not resolved here.
 
 ## Reading a vehicle
 

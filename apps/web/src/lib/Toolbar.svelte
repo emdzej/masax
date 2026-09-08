@@ -62,9 +62,9 @@
       href={releaseUrl()}
       target="_blank"
       rel="noreferrer noopener"
-      title={`Release notes for v${VERSION}`}
+      title={`Release notes for ${VERSION}`}
     >
-      v{VERSION}
+      {VERSION}
     </a>
     <a
       class="repo"

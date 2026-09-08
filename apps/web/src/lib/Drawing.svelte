@@ -12,8 +12,13 @@
   callouts on a plate belong to a different variant, and some are `REF.`
   pointers into another group. Those are drawn but not clickable — visible,
   because they are on the paper, and inert, because they are not on this list.
+
+  At actual size the drawing is larger than its column, so the frame scrolls and
+  can be dragged. A drag that crosses a callout must not select it, so a click
+  is swallowed once the pointer has travelled far enough to be a pan.
 -->
 <script lang="ts">
+  import { tick } from "svelte";
   import ImageOff from "@lucide/svelte/icons/image-off";
   import Maximize2 from "@lucide/svelte/icons/maximize-2";
   import Minimize2 from "@lucide/svelte/icons/minimize-2";
@@ -59,6 +64,9 @@
   let actual = $state(false);
   /** Displayed size of the image, which the hotspot overlay must match exactly. */
   let stage = $state({ width: 0, height: 0 });
+
+  /** True while a drag is panning the frame, which also suppresses the click. */
+  let panning = $state(false);
 
   const name = $derived(plate?.illustration);
 
@@ -153,11 +161,88 @@
     };
   });
 
+  /**
+   * Drag to pan, once the drawing is bigger than its frame.
+   *
+   * The threshold is what keeps the callouts usable: without it, the few pixels
+   * of travel in an ordinary click would scroll the plate out from under the
+   * pointer, and every click would land on the wrong number. Below it the
+   * gesture is a click and the hotspot gets it; above it the gesture is a pan
+   * and the click is swallowed in the capture phase, before any button sees it.
+   */
+  const PAN_THRESHOLD = 4;
+
+  let drag: { x: number; y: number; left: number; top: number } | undefined;
+
+  function startPan(event: PointerEvent): void {
+    if (!actual || !frame || event.button !== 0) return;
+    drag = { x: event.clientX, y: event.clientY, left: frame.scrollLeft, top: frame.scrollTop };
+  }
+
+  function movePan(event: PointerEvent): void {
+    if (!drag || !frame) return;
+    const dx = event.clientX - drag.x;
+    const dy = event.clientY - drag.y;
+    if (!panning && Math.hypot(dx, dy) < PAN_THRESHOLD) return;
+    panning = true;
+    // Capture the pointer only once it is a pan, so a plain click on a callout
+    // is never stolen from the button.
+    frame.setPointerCapture(event.pointerId);
+    frame.scrollLeft = drag.left - dx;
+    frame.scrollTop = drag.top - dy;
+    event.preventDefault();
+  }
+
+  function endPan(event: PointerEvent): void {
+    if (frame?.hasPointerCapture(event.pointerId)) frame.releasePointerCapture(event.pointerId);
+    drag = undefined;
+  }
+
+  function swallowClickAfterPan(event: MouseEvent): void {
+    if (!panning) return;
+    panning = false;
+    event.stopPropagation();
+    event.preventDefault();
+  }
+
+  /**
+   * Centre the plate when zooming in, so the middle of the fitted view is kept.
+   *
+   * After `tick()`, not in a frame callback: the stage is resized by an effect
+   * and the centre depends on `scrollWidth`, which is still the fitted width
+   * until that effect has flushed and the DOM has caught up.
+   */
+  async function toggleActual(): Promise<void> {
+    actual = !actual;
+    if (!actual) return;
+    await tick();
+    if (!frame) return;
+    frame.scrollLeft = (frame.scrollWidth - frame.clientWidth) / 2;
+    frame.scrollTop = (frame.scrollHeight - frame.clientHeight) / 2;
+  }
+
   const pickable = (spot: Hotspot) => available.has(spot.pnc);
 </script>
 
 <figure class="sheet">
-  <div class="frame" bind:this={frame} class:empty={!name} class:actual>
+  <!--
+    The pan listeners live on the frame because the frame is the scroll port.
+    `onclickcapture` runs before the callout buttons, which is the only place a
+    drag can be told apart from a click in time to stop it.
+  -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="frame"
+    bind:this={frame}
+    class:empty={!name}
+    class:actual
+    class:panning
+    onpointerdown={startPan}
+    onpointermove={movePan}
+    onpointerup={endPan}
+    onpointercancel={endPan}
+    onclickcapture={swallowClickAfterPan}
+  >
     {#if !name}
       <p class="none">Choose a plate.</p>
     {:else if problem}
@@ -187,17 +272,22 @@
       {/each}
     </div>
 
-    {#if name && !problem}
-      <button
-        class="zoom"
-        onclick={() => (actual = !actual)}
-        title={actual ? "Fit to the column" : "Show at actual size"}
-        aria-label={actual ? "Fit to the column" : "Show at actual size"}
-      >
-        {#if actual}<Minimize2 size={13} />{:else}<Maximize2 size={13} />{/if}
-      </button>
-    {/if}
   </div>
+
+  <!--
+    Outside the frame on purpose: the frame is the scroll port at actual size,
+    so a button positioned inside it scrolls away with the drawing.
+  -->
+  {#if name && !problem}
+    <button
+      class="zoom"
+      onclick={toggleActual}
+      title={actual ? "Fit to the column" : "Show at actual size, and drag to pan"}
+      aria-label={actual ? "Fit to the column" : "Show at actual size"}
+    >
+      {#if actual}<Minimize2 size={13} />{:else}<Maximize2 size={13} />{/if}
+    </button>
+  {/if}
 
   {#if plate}
     <figcaption class="block">
@@ -234,6 +324,8 @@
 <style>
   .sheet {
     margin: 0;
+    /* Anchors the zoom button, which must not scroll with the drawing. */
+    position: relative;
     display: flex;
     flex-direction: column;
     /*
@@ -264,6 +356,20 @@
     place-items: start;
     overflow: auto;
     padding: 0.5rem;
+    cursor: grab;
+    /* A drag on the plate pans it; it must not select the drawing as text. */
+    user-select: none;
+    /* Pinch-zoom and wheel still work, but a touch drag pans instead of scrolling
+       the page away. */
+    touch-action: pan-x pan-y;
+  }
+  .frame.actual.panning {
+    cursor: grabbing;
+  }
+  /* The plate is smaller than the frame in one axis often enough that a grab
+     cursor over dead space would be a lie, so it sits on the stage too. */
+  .frame.actual .stage {
+    margin: auto;
   }
 
   /*
@@ -321,6 +427,7 @@
     position: absolute;
     top: 0.4rem;
     right: 0.4rem;
+    z-index: 1;
     display: flex;
     padding: 0.25rem;
     border: 1px solid var(--rule);

@@ -3,7 +3,10 @@
 Notes for anyone — human or agent — changing this repository. Conventions, and
 mostly the ones learned by getting them wrong. For how the format works read
 [`docs/data-format.md`](docs/data-format.md); for what the source archives are
-read [`docs/media.md`](docs/media.md).
+read [`docs/media.md`](docs/media.md). For the system as a whole — the
+pipeline, the joins and a build order — read
+[`docs/how-it-works.md`](docs/how-it-works.md); the user-facing guide is
+[`docs/guide.md`](docs/guide.md).
 
 This is a parts catalogue. A wrong applicability decision puts a part on a
 vehicle it does not fit, and nothing in a passing test run will tell you.
@@ -133,6 +136,22 @@ because of a bad comparison: `P02V` was checked against `B6037609A`, which is
 the Pajero I catalogue and simply not the one for that model. **Before
 concluding two code sets are unrelated, check a pair the data says belongs
 together.**
+
+## The parts table does not key to a plate
+
+`catalog` keys to `(model, main group, subgroup)`. Several plates can share a
+subgroup number — `13-010` on a `V25W` is three — and they all read the same
+run. **The drawing is the discriminator:** its callouts are its share of the
+list. Verified at scale, 99.72% of subgroup codes are claimed by some drawing of
+their subgroup.
+
+Do not filter without the two escape hatches: a drawing with no callouts implies
+nothing (2,160 plates), and a code that _no_ drawing of the subgroup claims must
+stay on every plate of it (2,046 codes) or it disappears everywhere at once.
+
+This is the plate↔parts join, **not** vehicle applicability. Narrowing to one
+vehicle by date, OPC and classification is still unresolved — see
+`docs/data-format.md`, "What is not established". Do not guess it.
 
 ## A tag's declared length can be a lie
 

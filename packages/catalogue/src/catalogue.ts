@@ -15,9 +15,27 @@
 import type { AsaDate, CatalogueId, Language, Pnc, PartNumber } from "@masax/core";
 import type { CsFileSystem } from "@emdzej/csfs-core";
 import { Dataset, listDirectory, type LexRecord } from "@masax/lex";
+import { deobfuscate, readIfd, hotspotsFromTiff, HOTSPOT_TAG } from "@masax/illust";
 import { TextTable } from "./text.js";
 import { VinIndex } from "./vin.js";
 import { CATALOGUE_DATASETS } from "./datasets.js";
+
+/**
+ * Keep the rows of a subgroup run that belong to one of its plates.
+ *
+ * `own` is what that plate's drawing calls out; `claimed` is what any drawing of
+ * the subgroup calls out. A row survives if its own drawing names it, or if no
+ * drawing in the subgroup names it — the second clause is the escape hatch, so
+ * a part that no image happens to call out stays visible instead of vanishing
+ * from every plate at once.
+ */
+export function narrowToPlate(
+  rows: readonly PartRow[],
+  own: ReadonlySet<Pnc>,
+  claimed: ReadonlySet<Pnc>,
+): PartRow[] {
+  return rows.filter((row) => own.has(row.pnc) || !claimed.has(row.pnc));
+}
 
 const runKeyOf = (name: string): readonly string[] =>
   CATALOGUE_DATASETS.find((d) => d.name === name)?.runKey ?? [];
@@ -109,6 +127,8 @@ export interface OpenOptions {
 
 export class AsaCatalogue {
   private readonly partsCache = new Map<CatalogueId, PartRow[]>();
+  /** Callout codes per drawing basename; null when the drawing has none. */
+  private readonly calloutCache = new Map<string, ReadonlySet<Pnc> | null>();
 
   private constructor(
     private readonly fs: CsFileSystem,
@@ -349,12 +369,18 @@ export class AsaCatalogue {
   }
 
   /**
-   * Every part on one plate.
+   * Every part filed under one subgroup — the union across its plates.
    *
-   * No applicability filtering is applied. The fields that would drive it —
-   * `opc`, `classification`, `applicableCodes` and the date window — are
-   * returned as the data holds them, because how ASA combines them has not been
-   * established here, and guessing would put parts on vehicles they do not fit.
+   * A subgroup number can carry several plates: `13-010` on `V25W` is three,
+   * a filler pipe and two tank-and-tube variants, and the parts table keys only
+   * to `13-010`. So this is a superset of any one plate. `partsForPlate`
+   * narrows it; this is the whole run.
+   *
+   * No vehicle-level applicability filtering is applied. The fields that would
+   * drive it — `opc`, `classification`, `applicableCodes` and the date window —
+   * are returned as the data holds them, because how ASA combines them has not
+   * been established here, and guessing would put parts on vehicles they do not
+   * fit.
    */
   async partsFor(
     id: CatalogueId,
@@ -366,6 +392,84 @@ export class AsaCatalogue {
     return table.filter(
       (row) => row.model === model && row.mainGroup === mainGroup && row.subGroup === subGroup,
     );
+  }
+
+  /**
+   * The callout codes printed on one drawing.
+   *
+   * Cached by basename, because 11,839 of the 16,332 referenced drawings are
+   * shared by more than one plate and one is shared by 235.
+   */
+  async calloutsFor(illustration: string): Promise<ReadonlySet<Pnc> | undefined> {
+    const cached = this.calloutCache.get(illustration);
+    if (cached !== undefined) return cached ?? undefined;
+
+    let codes: ReadonlySet<Pnc> | null = null;
+    const stored = await this.readIllustration(illustration);
+    if (stored) {
+      const tiff = deobfuscate(stored);
+      const { offsets } = readIfd(tiff);
+      const { hotspots } = hotspotsFromTiff(tiff, offsets.get(HOTSPOT_TAG));
+      if (hotspots.length > 0) codes = new Set(hotspots.map((h) => h.pnc as Pnc));
+    }
+    this.calloutCache.set(illustration, codes);
+    return codes ?? undefined;
+  }
+
+  /**
+   * The parts on one plate, narrowed to that plate's drawing.
+   *
+   * The parts table keys to the subgroup, not to the plate, so several plates
+   * that share a subgroup number share one run: `13-010` on `V25W` is 70 rows
+   * over 47 codes across three drawings. What separates them is the drawing —
+   * its callouts *are* its share of the list. For that subgroup the three
+   * drawings carry 11, 33 and 29 codes and their union is exactly the 47.
+   *
+   * Nothing in `BGroup` would do this: those three plates differ only in their
+   * description text and their `Illustration`, with no date, classification or
+   * OPC between them. The narrowing has to come from the image.
+   *
+   * Measured over all 60,698 plates: 733,228 of 735,274 subgroup codes appear
+   * on some drawing of their subgroup, so the rule accounts for **99.72%**, and
+   * it halves a plate's list — 1,685,164 codes down to 944,471.
+   *
+   * Two deliberate escape hatches, because losing a real part is worse than
+   * showing a spare one:
+   *
+   * - **A drawing with no callouts returns the run unnarrowed.** 2,160 plates
+   *   have none, and a plate whose image carries no coordinates says nothing
+   *   about which parts are its own.
+   * - **A code on no drawing of the subgroup is kept on every plate of it.**
+   *   That is the other 0.28%, 2,046 codes; they are real parts that no image
+   *   calls out, and filtering them away would hide them everywhere.
+   *
+   * The reverse mismatch is left alone: 83,597 callouts name a code that is not
+   * in this subgroup's run at all, because a shared drawing carries every
+   * model's callouts, plus 29,507 that are `REF.` pointers into other groups.
+   * Those are drawn — they are printed on the paper — and left inert.
+   */
+  async partsForPlate(
+    id: CatalogueId,
+    model: string,
+    mainGroup: number,
+    subGroup: number,
+    illustration: string | undefined,
+  ): Promise<PartRow[]> {
+    const rows = await this.partsFor(id, model, mainGroup, subGroup);
+    if (!illustration || rows.length === 0) return rows;
+
+    const own = await this.calloutsFor(illustration);
+    if (!own) return rows;
+
+    // Which codes any drawing of this subgroup claims. Those it does not are
+    // kept on every plate rather than filtered away everywhere.
+    const claimed = new Set<Pnc>();
+    for (const plate of this.platesFor(id, model, mainGroup)) {
+      if (plate.subGroup !== subGroup || !plate.illustration) continue;
+      const codes = await this.calloutsFor(plate.illustration);
+      if (codes) for (const code of codes) claimed.add(code);
+    }
+    return narrowToPlate(rows, own, claimed);
   }
 
   /**

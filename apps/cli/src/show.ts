@@ -86,25 +86,34 @@ export async function show(
   }
 
   const subGroup = Number(subGroupText);
-  const parts = await catalogue.partsFor(id, model, mainGroup, subGroup);
-  const plate = catalogue.platesFor(id, model, mainGroup).find((p) => p.subGroup === subGroup);
-  console.log(
-    chalk.bold(
-      `${id} / ${model} / ${mainGroup}-${String(subGroup).padStart(3, "0")}` +
-        `${plate?.name ? ` — ${plate.name}` : ""}`,
-    ),
-  );
-  if (plate?.illustration) console.log(chalk.dim(`  drawing ${plate.illustration}`));
-  console.log(
-    `  ${"PNC".padEnd(8)}${"part".padEnd(12)}${"qty".padEnd(4)}` +
-      `${"dates".padEnd(30)}${"OPC".padEnd(5)}name / applicability`,
-  );
-  for (const row of parts) console.log(`  ${formatPart(row)}`);
-  console.log(
-    chalk.dim(
-      `\n  ${parts.length} parts, ${new Set(parts.map((p) => p.pnc)).size} part-name codes`,
-    ),
-  );
+  // A subgroup number can carry several plates, each with its own drawing and
+  // its own share of one shared parts run. Print every one of them: picking the
+  // first would silently hide the others and show a list belonging to all three.
+  const plates = catalogue.platesFor(id, model, mainGroup).filter((p) => p.subGroup === subGroup);
+  const label = `${id} / ${model} / ${mainGroup}-${String(subGroup).padStart(3, "0")}`;
+  if (plates.length === 0) {
+    console.error(`${label}: no such plate`);
+    await catalogue.close();
+    return 1;
+  }
+  if (plates.length > 1) {
+    console.log(chalk.dim(`${label}: ${plates.length} plates share this number\n`));
+  }
+  for (const plate of plates) {
+    const parts = await catalogue.partsForPlate(id, model, mainGroup, subGroup, plate.illustration);
+    const whole = await catalogue.partsFor(id, model, mainGroup, subGroup);
+    console.log(chalk.bold(`${label}${plate.name ? ` — ${plate.name}` : ""}`));
+    if (plate.note) console.log(chalk.dim(`  ${plate.note}`));
+    if (plate.illustration) console.log(chalk.dim(`  drawing ${plate.illustration}`));
+    console.log(
+      `  ${"PNC".padEnd(8)}${"part".padEnd(12)}${"qty".padEnd(4)}` +
+        `${"dates".padEnd(30)}${"OPC".padEnd(5)}name / applicability`,
+    );
+    for (const row of parts) console.log(`  ${formatPart(row)}`);
+    const codes = new Set(parts.map((p) => p.pnc)).size;
+    const shared = parts.length === whole.length ? "" : ` of ${whole.length} in the subgroup run`;
+    console.log(chalk.dim(`\n  ${parts.length} parts${shared}, ${codes} part-name codes\n`));
+  }
   await catalogue.close();
   return 0;
 }

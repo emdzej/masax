@@ -27,8 +27,8 @@ a fifth of the records. It points at the first record of a **run**, and later
 records in a run inherit the fields they omit — see
 [`docs/data-format.md`](docs/data-format.md#runs-and-the-fields-a-record-inherits).
 
-Every one of the parts drawings decodes: 10,694 of 10,694 on disc B, none
-failing. They are stored as `*.tif` but are **not** TIFFs until de-obfuscated,
+Every one of the parts drawings decodes — 10,694 of 10,694 on disc B and
+17,977 across both, none failing. They are stored as `*.tif` but are **not** TIFFs until de-obfuscated,
 and the Group 4 decoder in `packages/illust` is pixel-identical to a reference
 decoder on every drawing tested — see
 [`docs/data-format.md`](docs/data-format.md#illustrations).
@@ -105,22 +105,38 @@ a `CsFile` is `Blob`-shaped, so `slice(pos, pos + len).bytes()` is exactly the
 record read this format needs, over a picked directory, OPFS, HTTP `Range` or
 `node:fs` without changing a line of the engine.
 
-Four browser tests walk the whole chain over HTTP `Range`, including that the
-canvas is actually painted rather than left blank.
+Ten browser tests walk the whole chain over HTTP `Range` — including that the
+canvas is actually painted rather than left blank, that a callout links to its
+row and back, and that three plates sharing a number get three different lists.
 
 Decoding a VIN opens the catalogue and model it belongs to, so a VIN alone gets
 you to a parts list — `VInfo` supplies that mapping, and the model code is the
 same one the catalogues use: `V25W` is both what the VIN says and what
 `PAJERO/MONTERO(EUR)` lists.
 
-**Applicability within a plate is not filtered.** Every part is shown with its
-conditions visible — OPC, classification, applicable codes, date window. How ASA
-combines those into "fits this vehicle" has not been established here, and a
-wrong filter hides a part that fits or offers one that does not without saying
-so. See [`docs/plan.md`](docs/plan.md#4-order-of-work), phase 5b.
+**A plate shows its own parts, not its subgroup's.** `catalog` keys to
+`(model, main group, subgroup)` and does not key to a plate, so the three
+`13-010 FUEL TANK` plates on a `V25W` all read the same 70 rows. What separates
+them is the drawing: its callouts are its share of the list — 11, 33 and 29
+codes across the three, union exactly the 47 the run holds. Over all 60,698
+plates the rule accounts for **99.72%** of subgroup codes and halves a plate's
+list. A code that no drawing of the subgroup claims stays on every plate of it,
+because losing a real part is worse than showing a spare one.
+
+**Applicability to a particular vehicle is still not filtered.** Every surviving
+row is shown with its conditions visible — OPC, classification, applicable
+codes, date window. How ASA combines those into "fits this vehicle" has not been
+established here, and a wrong filter hides a part that fits or offers one that
+does not without saying so. See
+[`docs/data-format.md`](docs/data-format.md#what-is-not-established).
 
 ## Read this next
 
+- **[`docs/guide.md`](docs/guide.md)** — the user guide: mounting the discs,
+  importing, and finding a part.
+- **[`docs/how-it-works.md`](docs/how-it-works.md)** — how ASA works and how to
+  rebuild it: the pipeline, the join graph, the algorithms, the traps, and a
+  build order where every step has a number to check against.
 - **[`docs/plan.md`](docs/plan.md)** — why the project is shaped this way, the
   sizing that makes it client-side, and what is deliberately not done yet.
 - **[`docs/data-format.md`](docs/data-format.md)** — the format specification:
@@ -157,7 +173,7 @@ masax vin  out/M60 JMAGZP02VHA000001                # decode a VIN
 
 masax illust out/M60/ILLUST --check                 # decode every drawing
 masax illust out/M60/ILLUST -o png/ --png           # convert them
-masax manifest out/M60 -o out/M60/manifest.json     # to serve over HTTP
+masax serve out/M60 -a apps/web/dist                # host the tree and client
 ```
 
 `re/tools/*.py` is the original Python reader, kept as a differential oracle for

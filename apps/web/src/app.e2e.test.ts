@@ -186,6 +186,80 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
     await expect.poll(() => page.locator("tbody tr.linked").count()).toBe(0);
   });
 
+  it("gives each plate that shares a subgroup number its own parts list", async () => {
+    // 13-010 on a V25W is three plates over one run of 70 rows: a filler pipe
+    // and two tank-and-tube variants. Nothing in BGroup separates them, so the
+    // drawing does — its callouts are its share of the list.
+    await page.selectOption("select#catalogue", "B60356A4A");
+    await page.selectOption("select#model", "V25W");
+    await page.getByRole("button", { name: /^13\s/ }).click();
+
+    const plates = page.locator("section.rail").last().locator("button.row");
+    // Matched on the code cell, not the row text: the row opens with an empty
+    // marker span, so anchoring a regex to the start of the row never matches.
+    const tanks = plates.filter({ has: page.locator("span.num", { hasText: /^010$/ }) });
+    expect(await tanks.count()).toBe(3);
+
+    const lists: string[][] = [];
+    for (let i = 0; i < 3; i++) {
+      await tanks.nth(i).click();
+      const rows = page.locator("tbody tr");
+      await expect.poll(() => rows.count(), { timeout: 30_000 }).toBeGreaterThan(0);
+      lists.push(
+        await page
+          .locator("tbody tr")
+          .evaluateAll((all) => all.map((row) => row.getAttribute("data-pnc") ?? "")),
+      );
+    }
+
+    // Each is a strict subset of the run, and together they are the whole run.
+    // The three drawings carry 11, 33 and 29 callouts; two of those are `13 020`
+    // REF. pointers into another subgroup rather than parts, hence 32 and 28.
+    const codes = lists.map((list) => new Set(list.filter(Boolean)));
+    expect(codes.map((c) => c.size)).toEqual([11, 32, 28]);
+    expect(new Set(codes.flatMap((c) => [...c])).size).toBe(47);
+
+    // The filler-pipe plate is the small one, and it is filler-pipe parts.
+    await tanks.first().click();
+    await expect.poll(() => page.locator("tbody tr").count()).toBe(19);
+    expect(await page.locator("tbody").textContent()).toContain("PIPE,FUEL FILLER");
+    expect(await page.locator("tbody").textContent()).not.toContain("FUEL PUMP ASSY");
+  });
+
+  it("pans the drawing at actual size, without the drag selecting a callout", async () => {
+    const zoom = page.getByRole("button", { name: "Show at actual size" });
+    await zoom.click();
+    const frame = page.locator(".frame.actual");
+    await expect.poll(() => frame.count()).toBe(1);
+
+    // Zooming in centres the plate, so there is room to drag in both directions.
+    const start = await frame.evaluate((el) => ({ x: el.scrollLeft, y: el.scrollTop }));
+    expect(start.x + start.y).toBeGreaterThan(0);
+
+    const box = (await frame.boundingBox())!;
+    const from = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    // In steps, because a single jump does not produce intermediate moves.
+    for (let i = 1; i <= 5; i++) await page.mouse.move(from.x - i * 12, from.y - i * 8);
+    await page.mouse.up();
+
+    const after = await frame.evaluate((el) => ({ x: el.scrollLeft, y: el.scrollTop }));
+    expect(after.x).toBeGreaterThan(start.x);
+    expect(after.y).toBeGreaterThan(start.y);
+    // A drag that crossed a callout must not have selected one.
+    expect(await page.locator("tbody tr.linked").count()).toBe(0);
+
+    // The control stays in the corner rather than scrolling away with the plate.
+    const button = (await page.getByRole("button", { name: "Fit to the column" }).boundingBox())!;
+    const sheet = (await page.locator("figure.sheet").boundingBox())!;
+    expect(button.y - sheet.y).toBeLessThan(24);
+    expect(sheet.x + sheet.width - (button.x + button.width)).toBeLessThan(24);
+
+    await page.getByRole("button", { name: "Fit to the column" }).click();
+    await expect.poll(() => page.locator(".frame.actual").count()).toBe(0);
+  });
+
   it("filters the group list by number and by name", async () => {
     const groups = page.locator("section.rail").first();
     const before = await groups.locator("button.row").count();

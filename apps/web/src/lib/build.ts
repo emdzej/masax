@@ -9,4 +9,4 @@ export const REPOSITORY: string = __MASAX_REPOSITORY__;
 
 /** The release notes for exactly this version. */
 export const releaseUrl = (version: string = VERSION): string =>
-  `${REPOSITORY}/releases/tag/v${version}`;
+  `${REPOSITORY}/releases/tag/${version}`;
