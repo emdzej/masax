@@ -88,6 +88,20 @@ export interface PartRow {
   feature?: string;
 }
 
+export interface VehicleCatalogue {
+  catalogue: CatalogueId;
+  /** The catalogue's model code, which is the same code `Vin` reports. */
+  model: string;
+  /** Vehicle name code, `VInfo`'s own key. */
+  vnc?: string;
+  /** Catalogue name, e.g. `PAJERO/MONTERO(EUR)`. */
+  name?: string;
+  /** Which fields decided it. */
+  via: "model and classification" | "model";
+  /** Other catalogues that also list this model, when the model alone is ambiguous. */
+  alternatives: CatalogueId[];
+}
+
 export interface OpenOptions {
   generation?: 1 | 2;
   language?: Language;
@@ -105,6 +119,7 @@ export class AsaCatalogue {
     private readonly mainGroups: LexRecord[],
     private readonly subGroups: LexRecord[],
     private readonly plates: LexRecord[],
+    private readonly vehicleInfo: LexRecord[],
   ) {}
 
   static async open(fs: CsFileSystem, options: OpenOptions = {}): Promise<AsaCatalogue> {
@@ -148,7 +163,70 @@ export class AsaCatalogue {
       await load("MGroup"),
       await load("SGroup"),
       await load("BGroup"),
+      await load("VInfo"),
     );
+  }
+
+  /**
+   * Which catalogue and model a decoded vehicle belongs to.
+   *
+   * `VInfo` is the bridge, and it is keyed on exactly what `Vin` reports:
+   * `A1` is the model code — the *same* vocabulary the catalogues use, so
+   * `V25W` is both what the VIN decodes to and what
+   * `PAJERO/MONTERO(EUR)` lists — `A5` is the catalogue, and the `B0` group is
+   * the classifications that catalogue covers.
+   *
+   * The classification is needed, not optional. 16 of the 242 models are listed
+   * by more than one catalogue — `E32A` by both `B6085101A` and `B6085601A` —
+   * and the classification separates them. Measured over every `Vin` record
+   * that carries a model, all 167,446 of them, model *and* classification pin
+   * exactly one catalogue: none ambiguous, none unresolved.
+   */
+  resolveVehicle(vehicle: {
+    model?: string;
+    classification?: string;
+  }): VehicleCatalogue | undefined {
+    const model = vehicle.model;
+    if (!model) return undefined;
+
+    const rows = this.vehicleInfo.filter((r) => text(r, "A1") === model);
+    if (rows.length === 0) return undefined;
+
+    const named = (id: string) => this.info.find((c) => c.id === id)?.name;
+    const alternatives = [...new Set(rows.map((r) => text(r, "A5")).filter(Boolean))] as string[];
+
+    if (vehicle.classification) {
+      const exact = rows.find((r) => {
+        const group = r["B0"];
+        return (
+          Array.isArray(group) &&
+          group.some((row) => typeof row === "object" && row["B1"] === vehicle.classification)
+        );
+      });
+      const catalogue = exact ? text(exact, "A5") : undefined;
+      if (exact && catalogue) {
+        return {
+          catalogue,
+          model,
+          vnc: text(exact, "A0"),
+          name: named(catalogue),
+          via: "model and classification",
+          alternatives: alternatives.filter((id) => id !== catalogue),
+        };
+      }
+    }
+
+    // No classification, or one this data does not list against the model.
+    const first = alternatives[0];
+    if (!first) return undefined;
+    return {
+      catalogue: first,
+      model,
+      vnc: text(rows[0]!, "A0"),
+      name: named(first),
+      via: "model",
+      alternatives: alternatives.slice(1),
+    };
   }
 
   catalogues(): CatalogueInfo[] {

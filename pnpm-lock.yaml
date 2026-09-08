@@ -35,6 +35,9 @@ importers:
       '@emdzej/csfs-core':
         specifier: ^0.1.0
         version: 0.1.0
+      '@emdzej/csfs-http':
+        specifier: ^0.1.0
+        version: 0.1.0
       '@emdzej/csfs-manifest':
         specifier: ^0.1.0
         version: 0.1.0

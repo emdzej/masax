@@ -187,6 +187,20 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
     expect(await strip.textContent()).toContain("1986-11");
   });
 
+  it("opens the catalogue and model the VIN belongs to", async () => {
+    // VInfo maps the decoded model and classification to a catalogue, and the
+    // model code is the same vocabulary the catalogues use — so a VIN alone is
+    // enough to get to a parts list.
+    await page.locator("input#vin").fill("JMB0RV250RJ000188");
+    await page.getByRole("button", { name: "Decode" }).click();
+    await expect
+      .poll(() => page.locator("select#catalogue").inputValue(), { timeout: 30_000 })
+      .toBe("B60356A4A");
+    expect(await page.locator("select#model").inputValue()).toBe("V25W");
+    // and it says how it decided
+    expect(await page.locator(".strip").textContent()).toContain("PAJERO/MONTERO");
+  });
+
   it("follows the XREF for a VIN whose record has no specification", async () => {
     // The other 96.9%. Before the XREF was followed this decoded to a build
     // date and nothing else, which reads as "not in the data".

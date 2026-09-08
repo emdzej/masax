@@ -24,7 +24,8 @@
     "@masax/lex": "workspace:*",
     "chalk": "^6.0.0",
     "commander": "^15.0.0",
-    "@masax/importer": "workspace:*"
+    "@masax/importer": "workspace:*",
+    "@emdzej/csfs-http": "^0.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.1"

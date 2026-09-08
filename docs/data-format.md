@@ -341,6 +341,39 @@ a confidently wrong answer. For `JMB0RV250R` the nearest preceding record with a
 model says `V23W` — the 2.3 litre — where the XREF says `V25W`. Same plate, wrong
 engine.
 
+### From a VIN to a catalogue
+
+`VInfo` is the bridge, and it is keyed on exactly what `Vin` reports:
+
+| field | holds                                                   |
+| ----- | ------------------------------------------------------- |
+| `A0`  | VNC — vehicle name code, the table's own key            |
+| `A1`  | **model code — the same vocabulary the catalogues use** |
+| `A5`  | the catalogue id                                        |
+| `B0`  | the classifications that catalogue covers               |
+
+So `V25W` is both what a VIN decodes to _and_ what `PAJERO/MONTERO(EUR)`
+(`B60356A4A`) lists as one of its 19 models. There is no translation step.
+
+**The classification is required, not an optimisation.** 16 of the 242 models
+are listed by more than one catalogue — `E32A` by both `B6085101A` and
+`B6085601A`, `D22A` by both `C6086411D` and `C6086404D` — and the classification
+separates them. Measured over every `Vin` record that carries a model, all
+167,446: model _and_ classification pin exactly one catalogue, none ambiguous
+and none unresolved.
+
+Both routes to the catalogue agree. Of the 233 distinct models that appear in
+`Vin`, all 233 are listed by some catalogue, all 233 appear in `VInfo`, and
+`VInfo`'s answer is always among the catalogues that list the model. So `VInfo`
+is used because it disambiguates, not because the model list is unreliable.
+
+> An earlier version of this document said the `Vin` model code was "a different
+> vocabulary from the catalogue model code, bridged by `VInfo` patterns". That
+> was wrong, and wrong because of a bad comparison: `P02V` was checked against
+> `B6037609A`, which is the Pajero I catalogue and simply not the one for that
+> model. `VInfo`'s `A2` field does hold a pattern (`PA-PD#`, `L0/P0#`), but it is
+> a human-readable range label, not the join.
+
 ### Illustrations
 
 **The files under `ILLUST/` are named `*.tif` but are not TIFFs as stored.**

@@ -12,7 +12,7 @@
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import Diamond from "./Diamond.svelte";
   import { formatAsaDate } from "@masax/core";
-  import type { CatalogueInfo, VinRecord } from "@masax/catalogue";
+  import type { CatalogueInfo, VehicleCatalogue, VinRecord } from "@masax/catalogue";
 
   let {
     catalogues,
@@ -21,6 +21,7 @@
     selectedModel,
     vin,
     vehicle,
+    resolved,
     vinError,
     busy,
     onVin,
@@ -35,6 +36,7 @@
     selectedModel?: string;
     vin: string;
     vehicle?: VinRecord;
+    resolved?: VehicleCatalogue;
     vinError: string;
     busy: boolean;
     onVin: (value: string) => void;
@@ -123,11 +125,18 @@
         <dt class="label">Trim</dt>
         <dd class="code">{vehicle.interior ?? "—"}</dd>
       </dl>
-      {#if vehicle.specFrom}
-        <span class="via">
-          spec from serial <span class="code">{vehicle.specFrom}</span>
-        </span>
-      {/if}
+      <span class="via">
+        {#if resolved}
+          opened <span class="code">{resolved.name ?? resolved.catalogue}</span> from
+          {resolved.via}{#if resolved.alternatives.length}, over {resolved.alternatives
+              .length} other{resolved.alternatives.length === 1 ? "" : "s"}{/if}
+        {:else}
+          no catalogue listed for this model
+        {/if}
+        {#if vehicle.specFrom}
+          · spec from serial <span class="code">{vehicle.specFrom}</span>
+        {/if}
+      </span>
     {/if}
   </div>
 {/if}

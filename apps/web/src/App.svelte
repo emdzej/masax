@@ -59,6 +59,7 @@
     selectedModel={app.selectedModel}
     vin={app.vinInput}
     vehicle={app.vehicle}
+    resolved={app.vehicleCatalogue}
     vinError={app.vinError}
     busy={Boolean(app.busy)}
     onVin={(v) => (app.vinInput = v)}

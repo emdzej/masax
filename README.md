@@ -108,11 +108,16 @@ record read this format needs, over a picked directory, OPFS, HTTP `Range` or
 Four browser tests walk the whole chain over HTTP `Range`, including that the
 canvas is actually painted rather than left blank.
 
-**Applicability is not filtered.** Every part on a plate is shown with its
+Decoding a VIN opens the catalogue and model it belongs to, so a VIN alone gets
+you to a parts list — `VInfo` supplies that mapping, and the model code is the
+same one the catalogues use: `V25W` is both what the VIN says and what
+`PAJERO/MONTERO(EUR)` lists.
+
+**Applicability within a plate is not filtered.** Every part is shown with its
 conditions visible — OPC, classification, applicable codes, date window. How ASA
 combines those into "fits this vehicle" has not been established here, and a
 wrong filter hides a part that fits or offers one that does not without saying
-so. See [`docs/plan.md`](docs/plan.md#4-order-of-work), phase 5.
+so. See [`docs/plan.md`](docs/plan.md#4-order-of-work), phase 5b.
 
 ## Read this next
 

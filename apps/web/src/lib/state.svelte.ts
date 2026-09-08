@@ -17,6 +17,7 @@ import {
   type CatalogueInfo,
   type GroupRef,
   type PartRow,
+  type VehicleCatalogue,
   type VinRecord,
 } from "@masax/catalogue";
 import { EUROPE_LANGUAGES, type Language } from "@masax/core";
@@ -70,6 +71,8 @@ export class AppState {
   vinInput = $state("");
   vehicle = $state<VinRecord | undefined>(undefined);
   vinError = $state("");
+  /** How the catalogue and model were picked from the VIN, for the interface. */
+  vehicleCatalogue = $state<VehicleCatalogue | undefined>(undefined);
 
   private restoring = false;
 
@@ -357,16 +360,22 @@ export class AppState {
   }
 
   /**
-   * Decode a VIN.
+   * Decode a VIN, and open the catalogue and model it belongs to.
    *
-   * The vehicle's model code (`V25W`) is a different vocabulary from a
-   * catalogue's (`L042G`), bridged by `VInfo` patterns that are not implemented
-   * — so this reports the vehicle and does not pretend to know which catalogue
-   * it belongs to.
+   * `VInfo` maps the decoded model and classification to a catalogue, and the
+   * model code is the *same* vocabulary the catalogues use — `V25W` is both what
+   * the VIN decodes to and what `PAJERO/MONTERO(EUR)` lists. So a VIN alone is
+   * enough to reach a parts list, and the user does not have to know that a
+   * V25W is a Pajero.
+   *
+   * If the vehicle decodes but no catalogue lists its model, the vehicle is
+   * still reported: knowing what the car is beats saying nothing because the
+   * next step could not be taken.
    */
   async decodeVin(): Promise<void> {
     if (!this.catalogue) return;
     this.vinError = "";
+    this.vehicleCatalogue = undefined;
     this.busy = "Looking up the vehicle…";
     try {
       const result = await this.catalogue.vin.decode(this.vinInput);
@@ -376,6 +385,18 @@ export class AppState {
           result.sameSerial.length > 0
             ? `Serial ${result.serial} is in the data, but not with chassis ${result.chassis}.`
             : `Serial ${result.serial} is not in this data.`;
+        this.remember();
+        return;
+      }
+
+      const resolved = this.catalogue.resolveVehicle({
+        model: this.vehicle.model,
+        classification: this.vehicle.classification,
+      });
+      this.vehicleCatalogue = resolved;
+      if (resolved) {
+        this.selectCatalogue(resolved.catalogue);
+        if (this.models.includes(resolved.model)) this.selectModel(resolved.model);
       }
       this.remember();
     } catch (cause) {

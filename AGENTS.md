@@ -116,6 +116,24 @@ Both were found by asking "how often is this actually true?" rather than by
 reading one record. A sample of 150 real VINs across both halves now decodes
 150/150, 144 of them via XREF.
 
+## VInfo is the VIN-to-catalogue bridge
+
+`VInfo.A1` is a model code in the **same vocabulary the catalogues use**, and
+`A5` is the catalogue. So a decoded VIN reaches a parts list with no translation
+step: `V25W` is both what the VIN says and what `PAJERO/MONTERO(EUR)` lists.
+
+The classification is part of the key, not a refinement. 16 of the 242 models
+are listed by more than one catalogue, and the classification separates them —
+model _and_ classification pin exactly one catalogue for all 167,446 `Vin`
+records that carry a model.
+
+`docs/data-format.md` claimed for several commits that these were different
+vocabularies "bridged by VInfo patterns". That was wrong, and it was wrong
+because of a bad comparison: `P02V` was checked against `B6037609A`, which is
+the Pajero I catalogue and simply not the one for that model. **Before
+concluding two code sets are unrelated, check a pair the data says belongs
+together.**
+
 ## Case, across sources
 
 Disc A spells the drawings directory `Illust`; disc B spells it `ILLUST`. An

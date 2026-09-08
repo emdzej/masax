@@ -129,20 +129,21 @@ languages. 30 kB gzipped, no backend. Four browser tests walk the chain over
 HTTP `Range`, including that the canvas is actually painted rather than left
 blank.
 
-**Phase 5 — applicability. Not started, and deliberately not guessed.** This is
-the part that decides which parts fit which vehicle, and it is unresolved:
+**Phase 5 — from a VIN to a plate. Done.** `VInfo` maps a decoded model and
+classification to a catalogue, and the model code is the _same_ vocabulary the
+catalogues use, so a VIN alone reaches a parts list. Measured: model and
+classification pin exactly one catalogue for all 167,446 `Vin` records that
+carry a model. See [`data-format.md`](data-format.md#from-a-vin-to-a-catalogue).
 
-- `catalog` carries `OPC`, `Classification`, `ApplicableCodes` and a date
-  window per part, and `Vin` gives a vehicle's OPC, classification and build
-  date. The vocabularies plainly relate, but how ASA _combines_ them has not
-  been established.
-- The `Vin` model code (`P02V`) and the catalogue model code (`L042G`) are
-  different vocabularies. `VInfo` bridges them with patterns — `PA-PD#`,
-  `P13,15T`, `L0/P0#` — which need a matcher and are not implemented.
+**Phase 5b — applicability _within_ a plate. Not started, and deliberately not
+guessed.** `catalog` carries `OPC`, `Classification`, `ApplicableCodes` and a
+date window per part, and the decoded vehicle has an OPC, a classification and a
+build date. The vocabularies plainly relate, but how ASA _combines_ them into
+"fits this car" has not been established.
 
-So the client shows every part on a plate with its conditions visible, and does
-not filter. A filter that is wrong hides a part that fits or offers one that
-does not, and neither failure announces itself. Signing this phase off needs a
+So the client shows every part on the plate with its conditions visible, and
+does not filter. A filter that is wrong hides a part that fits or offers one
+that does not, and neither failure announces itself. Signing this off needs a
 vehicle whose correct parts list is known from outside this data.
 
 **Phase 6 — search.** Part-number lookup exists in the reader (`PREF` and
@@ -159,7 +160,7 @@ Measured: `masax verify /Volumes/MMC-A "/Volumes/MMC ASA 2"` reads all
 
 ## 5. Ranked risks
 
-1. **Applicability semantics** (Phase 5). Understood by example, not specified;
+1. **Applicability semantics** (Phase 5b). Understood by example, not specified;
    the failure mode is quiet and wrong. Mitigation: do not filter until there is
    a known-answer test.
 2. **Field inheritance.** Already bitten once — see
