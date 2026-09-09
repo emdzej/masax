@@ -285,9 +285,16 @@
 <style>
   .bar {
     display: flex;
-    align-items: flex-end;
+    /*
+     * Centred, not bottom-aligned. The three fields are label-over-input and so
+     * are twice the height of the wordmark and the tool icons; sitting those on
+     * the inputs' baseline left them pinned to the bottom edge of a bar they
+     * should read as sitting *in*. The fields still set the bar's height —
+     * everything else centres against it.
+     */
+    align-items: center;
     gap: 0.85rem;
-    padding: 0.5rem 0.75rem 0.45rem;
+    padding: 0.5rem 0.75rem;
     background: var(--sheet);
     border-bottom: 2px solid var(--red);
   }
@@ -298,7 +305,6 @@
     align-items: center;
     gap: 0.15rem;
     margin-left: auto;
-    padding-bottom: 0.1rem;
   }
   .basket {
     position: relative;
@@ -330,11 +336,11 @@
     clip-path: inset(50%);
     white-space: nowrap;
   }
+  /* The three inside it stay on a shared baseline: wordmark, version, mark. */
   .brand {
     display: flex;
     align-items: baseline;
     gap: 0.4rem;
-    padding-bottom: 0.28rem;
     margin-right: 0.15rem;
   }
   .wordmark {
