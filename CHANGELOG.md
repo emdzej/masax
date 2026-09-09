@@ -8,6 +8,57 @@ as much as its evidence — the reasoning behind each one is in
 Versions follow [semantic versioning](https://semver.org/). Before 1.0 a minor
 bump is where features land.
 
+## 0.4.0
+
+### Installable, and it opens with no network
+
+masax is a progressive web app now: a manifest, icons, and a service worker
+that precaches the shell.
+
+**The worker is written out rather than generated, and it is a whitelist.** It
+answers only for URLs it precached, plus navigations; everything else is left
+untouched. That is not caution for its own sake — a record read in this format
+is a `Range` request, and a worker that answered one from a cached `200` would
+hand back the wrong bytes at every offset while the reader decoded plausible
+garbage. A "cache-first, network-fallback" default would eventually do exactly
+that. The suite asserts that range reads still reach the network with the worker
+in control.
+
+Installing is about the software, not the data: a picked folder is already local
+and nothing is fetched to read a plate. What remains is that a folder loses its
+permission on reload, which needs one click per session, and that a hosted tree
+needs its host.
+
+### A copy in this browser
+
+Settings → Data location copies whatever is open — a folder, a hosted tree, an
+overlay of two discs — into the browser's own storage, which then reopens with
+no permission to grant and no host to be up. It can be deleted again, and it is
+namespaced so that deleting it means ours and nothing else on the origin.
+
+Only `EPC` is copied, about 430 MB. The rest of a module is the original Windows
+program, its dongle drivers and its installer, which masax never opens.
+
+**Leaving the drawings out costs more than the pictures**, and the panel says
+so: the plate-to-parts join is the callouts printed on the drawing, so without
+them a plate shows its whole subgroup's list — 44 rows rather than 11 on a
+Pajero's `13-010`.
+
+### Changed
+
+- The URL parameter that opens a hosted tree is `?data=<url>`. It was `?tree=`,
+  which nobody guesses; the old spelling is gone rather than aliased.
+
+### Fixed
+
+- `csfs-fsa` cannot create a directory when the filesystem was opened
+  case-insensitively: `dir(path, create)` resolves each segment with
+  `findChild`, gets null for an absent directory, and returns null instead of
+  creating it — the fallback that `fileHandle` has. So every write to a nested
+  path failed and the copy wrote nothing while looking merely slow. The copy
+  target is opened case-sensitively; reading it back still is not, because the
+  two discs disagree on `Illust` versus `ILLUST`. Worth fixing upstream.
+
 ## 0.3.1
 
 ### Fixed

@@ -24,7 +24,15 @@
 export type SavedSource =
   | { kind: "http"; url: string }
   /** Names are for the interface; the handles themselves are in IndexedDB. */
-  | { kind: "folders"; names: string[] };
+  | { kind: "folders"; names: string[] }
+  /**
+   * A copy the user made in this browser.
+   *
+   * Nothing to remember but the kind: there is one origin private filesystem
+   * per origin and the copy either exists or it does not. It is also the only
+   * source that reopens with neither a permission gesture nor a host.
+   */
+  | { kind: "offline" };
 
 /**
  * What was last being looked at.

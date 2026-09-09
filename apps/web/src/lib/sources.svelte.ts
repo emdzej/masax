@@ -106,6 +106,20 @@ export async function openHttp(base: string): Promise<Opened> {
   };
 }
 
+/**
+ * A subdirectory of our own inside OPFS.
+ *
+ * The origin private filesystem is shared by everything on the origin, so a
+ * consumer rooted at `/` can see — and delete — another one's files. Namespaced
+ * so that "delete the copy" means ours and nothing else.
+ */
+const NAMESPACE = "masax";
+
+/** What masax actually reads, and so all a copy needs to hold. */
+const NEEDED = /^epc$/i;
+/** The drawings: 381 MB of the module, and optional.  */
+const DRAWINGS = /^illust$/i;
+
 export interface OfflineProgress {
   files: number;
   bytes: number;
@@ -113,24 +127,58 @@ export interface OfflineProgress {
 }
 
 /**
- * Copy a tree into the origin private filesystem.
+ * Copy the open source into the origin private filesystem.
  *
- * Worth it for the catalogue data, which is the part that must be resident to
- * be useful. The drawings are 210 MB and can stay where they are, so they are
- * excluded by default and the interface says so.
+ * Not what makes the data available offline — a picked folder is already on
+ * disk and needs no network. What this buys is the two frictions that remain:
+ * a folder's permission does not survive a reload, so every session starts
+ * with a click, and a hosted tree needs its host to be up. A copy in the
+ * origin private filesystem needs neither.
+ *
+ * Takes the filesystem rather than an `Opened` so it can copy whatever is
+ * mounted, however it was mounted.
+ *
+ * Only `EPC` is copied, plus `Illust` when asked. The rest of a module is the
+ * original Windows program, its dongle drivers and its installer — 62 MB that
+ * masax never opens and has no business putting in a browser's storage. The
+ * drawings are another 381 MB, and a copy without them still answers "what is
+ * this part number".
  */
 export async function keepOffline(
-  opened: Opened,
+  /** Whatever is open now — a picked folder, a hosted tree, an overlay of two discs. */
+  source: CsFileSystem,
   options: { illustrations?: boolean; onProgress?: (p: OfflineProgress) => void } = {},
 ): Promise<{ files: number; bytes: number; granted: boolean }> {
-  const target = await opfsFileSystem({ caseInsensitive: true });
+  /*
+   * Case-sensitive on purpose, and it is not a preference.
+   *
+   * `csfs-fsa`'s `dir(path, create)` resolves a segment with `findChild`, which
+   * returns null when the directory does not exist yet — and then returns null
+   * rather than creating it. So with `caseInsensitive: true` a *write* to any
+   * nested path fails: nothing under `EPC/` can be created. `fileHandle` has
+   * the fallback that `dir` is missing (`?? (create ? name : null)`).
+   *
+   * The target does not need case-insensitivity anyway: this creates the tree
+   * from scratch with the source's own names. Reading it back does need it —
+   * the two discs disagree on `Illust` versus `ILLUST` — so `openOffline`
+   * keeps it.
+   */
+  const target = await opfsFileSystem({ namespace: NAMESPACE });
   const granted = await persist();
   let files = 0;
   let bytes = 0;
-  const result = await copyTree(opened.fs, target, {
-    filter: (path, entry) =>
-      options.illustrations === true ||
-      !(entry.kind === "directory" && /^illust$/i.test(path.split("/").pop() ?? "")),
+  const result = await copyTree(source, target, {
+    /*
+     * Judged on the first path segment, not the last. A filter that matched any
+     * directory named `illust` would also have to guess about everything else;
+     * deciding at the top level says exactly which trees are wanted and lets
+     * every path inside them through.
+     */
+    filter: (path) => {
+      const top = path.split("/")[0] ?? "";
+      if (path.includes("/")) return true;
+      return NEEDED.test(top) || (options.illustrations === true && DRAWINGS.test(top));
+    },
     onFile: (path, size) => {
       files++;
       bytes += size;
@@ -143,7 +191,7 @@ export async function keepOffline(
 /** An OPFS copy from a previous visit, if there is one. */
 export async function openOffline(): Promise<Opened | undefined> {
   if (!isOpfsSupported()) return undefined;
-  const fs = await opfsFileSystem({ caseInsensitive: true });
+  const fs = await opfsFileSystem({ caseInsensitive: true, namespace: NAMESPACE });
   const found = await survey(fs);
   const module = found.modules.find((m) => m.has.epc);
   if (!module) return undefined;
@@ -153,6 +201,25 @@ export async function openOffline(): Promise<Opened | undefined> {
     merged: fs,
     layers: [{ name: "offline copy", fs }],
   };
+}
+
+/**
+ * Delete the copy.
+ *
+ * Through the raw OPFS root rather than the filesystem abstraction, because
+ * what is wanted is to remove the namespace directory itself — and because a
+ * copy that cannot be deleted is a few hundred megabytes of the origin's quota
+ * with no way out but clearing all site data.
+ */
+export async function clearOffline(): Promise<void> {
+  if (!isOpfsSupported()) return;
+  const root = await navigator.storage.getDirectory();
+  try {
+    await root.removeEntry(NAMESPACE, { recursive: true });
+  } catch (cause) {
+    // Already gone is success. Anything else is worth surfacing.
+    if ((cause as DOMException)?.name !== "NotFoundError") throw cause;
+  }
 }
 
 export async function offlineQuota(): Promise<{ usage: number; quota: number } | undefined> {

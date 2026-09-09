@@ -721,6 +721,134 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
     await expect.poll(() => page.locator('[role="dialog"]').count()).toBe(0);
   });
 
+  it("installs a service worker that leaves the catalogue alone", async () => {
+    /*
+     * The whole suite above already ran with this worker in control, which is
+     * most of the evidence. This asserts the two properties directly, because
+     * the failure it guards against is silent: a worker that answered a
+     * `Range` request from cache would return the wrong bytes at every offset
+     * and the reader would decode plausible garbage rather than throw.
+     */
+    await expect
+      .poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller)), {
+        timeout: 30_000,
+      })
+      .toBe(true);
+
+    const caches = await page.evaluate(() => globalThis.caches.keys());
+    expect(caches).toEqual([expect.stringMatching(/^masax-shell-/)]);
+
+    // Only the shell, and nothing from the data tree.
+    const cached = await page.evaluate(async () => {
+      const [name] = await globalThis.caches.keys();
+      const cache = await globalThis.caches.open(name!);
+      return (await cache.keys()).map((r) => new URL(r.url).pathname);
+    });
+    expect(cached.length).toBeGreaterThan(4);
+    expect(cached.some((p) => p.startsWith("/data/"))).toBe(false);
+    expect(cached).toContain("/index.html");
+    expect(cached).toContain("/manifest.webmanifest");
+
+    // The manifest is installable: name, icons at both sizes, a maskable one.
+    const manifest = await page.evaluate(() =>
+      fetch("./manifest.webmanifest").then((r) => r.json()),
+    );
+    expect(manifest.name).toContain("masax");
+    expect(manifest.display).toBe("standalone");
+    expect(manifest.icons.map((i: { sizes: string }) => i.sizes)).toEqual([
+      "192x192",
+      "512x512",
+      "512x512",
+    ]);
+    expect(manifest.icons.some((i: { purpose?: string }) => i.purpose === "maskable")).toBe(true);
+
+    // And the worker declines a range request rather than answering it. Asked
+    // through the page so it goes through the worker exactly as a record read
+    // would.
+    const ranged = await page.evaluate(async (base) => {
+      const response = await fetch(`${base}/data/M60/EPC/DATA1/CInfo.ddm`, {
+        headers: { range: "bytes=0-15" },
+      });
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      return { status: response.status, length: bytes.length };
+    }, base);
+    // 206 and sixteen bytes: the server answered, not the cache.
+    expect(ranged).toEqual({ status: 206, length: 16 });
+  });
+
+  it("copies the open source into the browser and reads it back", async () => {
+    /*
+     * Its own context: this writes several hundred megabytes to the origin's
+     * storage and changes the saved source, neither of which the other tests
+     * should inherit. It deletes the copy again at the end.
+     *
+     * Worth the seconds it costs. It is what caught a bug in the filesystem
+     * layer — `dir(path, create)` will not create a directory when the
+     * filesystem was opened case-insensitively, so nothing under `EPC/` could
+     * be written and the copy failed on its first nested file.
+     */
+    const own = await browser.newContext();
+    const page2 = await own.newPage();
+    try {
+      await page2.goto(base);
+      await page2.getByPlaceholder(/example\.org/).fill(`${base}${modulePath(DATA!)}`);
+      await page2.getByRole("button", { name: "Open", exact: true }).click();
+      await page2.locator("input#catalogue").waitFor({ timeout: 90_000 });
+
+      await page2.locator(".tools button.cog").click();
+      await page2.getByRole("button", { name: "Keep a copy" }).click();
+      await expect
+        .poll(() => page2.locator('[role="dialog"]').innerText(), { timeout: 600_000 })
+        .toMatch(/Kept \d+ files/);
+
+      // Only what masax reads. The rest of a module is the original Windows
+      // program and its dongle drivers, and has no business in a browser.
+      const top = await page2.evaluate(async () => {
+        const root = await navigator.storage.getDirectory();
+        const ns = await root.getDirectoryHandle("masax");
+        const names: string[] = [];
+        for await (const [name] of ns.entries()) names.push(name);
+        return names;
+      });
+      expect(top).toEqual(["EPC"]);
+
+      // Read it back with the network down: no permission, no host.
+      await page2.getByRole("button", { name: "Open the copy" }).click();
+      await expect
+        .poll(() => page2.evaluate(() => localStorage.getItem("masax.settings.v1")))
+        .toContain('"kind":"offline"');
+
+      await own.setOffline(true);
+      await page2.reload({ waitUntil: "domcontentloaded" });
+      await page2.locator("input#catalogue").waitFor({ timeout: 60_000 });
+      await page2.locator("input#vin").fill("JMB0RV250RJ000188");
+      await page2.getByRole("button", { name: "Decode" }).click();
+      await expect
+        .poll(() => page2.locator("input#model").getAttribute("data-value"), { timeout: 60_000 })
+        .toBe("V25W");
+      await own.setOffline(false);
+
+      // Deleting it clears the copy and the source that pointed at it.
+      await page2.locator(".tools button.cog").click();
+      await page2.getByRole("button", { name: "Delete the copy" }).click();
+      await expect
+        .poll(() =>
+          page2.evaluate(async () => {
+            const root = await navigator.storage.getDirectory();
+            const names: string[] = [];
+            for await (const [name] of root.entries()) names.push(name);
+            return names;
+          }),
+        )
+        .toEqual([]);
+      expect(await page2.evaluate(() => localStorage.getItem("masax.settings.v1"))).not.toContain(
+        '"kind":"offline"',
+      );
+    } finally {
+      await own.close();
+    }
+  }, 900_000);
+
   it("filters the group list by number and by name", async () => {
     const groups = page.locator("section.rail").first();
     const before = await groups.locator("button.row").count();

@@ -12,6 +12,7 @@
    * for browsers without the File System Access API and for a hosted tree.
    */
   import FolderOpen from "@lucide/svelte/icons/folder-open";
+  import CloudOff from "@lucide/svelte/icons/cloud-off";
   import HardDrive from "@lucide/svelte/icons/hard-drive";
   import Link from "@lucide/svelte/icons/link";
   import Plus from "@lucide/svelte/icons/plus";
@@ -24,6 +25,7 @@
   import X from "@lucide/svelte/icons/x";
   import Diamond from "./Diamond.svelte";
   import type { Disc } from "./sources.svelte";
+  import type { AppState } from "./state.svelte";
   import type { SavedSource } from "./settings";
   import { LOCALES, i18n, segments, slot, type LocaleChoice } from "./i18n/index.svelte";
   import { THEME_CHOICES, theme } from "./theme.svelte";
@@ -31,6 +33,7 @@
   import { download } from "./bin.svelte";
 
   let {
+    app,
     saved,
     discs,
     conflicts,
@@ -50,6 +53,8 @@
     onLanguage,
     onClose,
   }: {
+    /** Passed whole for the offline copy, which needs several fields and two actions. */
+    app: AppState;
     saved: SavedSource | undefined;
     discs: Disc[];
     conflicts: string[];
@@ -82,6 +87,9 @@
   });
 
   const t = $derived(i18n.t);
+
+  /** Whether a copy should take the 210 MB of drawings with it. */
+  let withDrawings = $state(false);
 
   const ready = $derived(discs.some((d) => d.survey.modules.some((m) => m.has.epc)));
   const partial = $derived(discs.length === 1 && ready);
@@ -274,6 +282,59 @@
           {/each}
         </p>
       </section>
+
+      <!--
+        Last on the tab, because it acts on whatever the sections above opened:
+        it copies the source that is currently mounted.
+      -->
+      {#if app.offlineSupported}
+        <section>
+          <div class="head">
+            <span class="label">{t("offline.title")}</span>
+            {#if app.offlineUsage}
+              <span class="count code">
+                {t("offline.usage", {
+                  used: Math.round(app.offlineUsage.usage / 1e6),
+                  total: Math.round(app.offlineUsage.quota / 1e6),
+                })}
+              </span>
+            {/if}
+          </div>
+          <p class="note">{t("offline.lede")}</p>
+          <div class="row wrap">
+            {#if app.hasOfflineCopy && saved?.kind !== "offline"}
+              <button onclick={() => void app.openOfflineCopy()}>
+                <CloudOff size={13} /> {t("offline.open")}
+              </button>
+            {/if}
+            <label class="check">
+              <input type="checkbox" bind:checked={withDrawings} />
+              <span>{t("offline.withDrawings")}</span>
+            </label>
+            <!-- Disabled with nothing open: there would be nothing to copy. -->
+            <button
+              onclick={() => void app.keepCopyOffline(withDrawings)}
+              disabled={!app.catalogue || Boolean(app.offlineBusy) || Boolean(busy)}
+            >
+              {app.hasOfflineCopy ? t("offline.replace") : t("offline.keep")}
+            </button>
+          </div>
+          <!--
+            Said out loud, because it is not guessable: the plate-to-parts join
+            is the drawing's callouts, so a copy without drawings can only show
+            the whole subgroup's list.
+          -->
+          {#if !withDrawings}
+            <p class="note">{t("offline.drawingsMatter")}</p>
+          {/if}
+          {#if app.hasOfflineCopy}
+            <button class="text-btn" onclick={() => void app.deleteOfflineCopy()}>
+              <Trash2 size={12} /> {t("offline.delete")}
+            </button>
+          {/if}
+          {#if app.offlineBusy}<p class="note">{app.offlineBusy}</p>{/if}
+        </section>
+      {/if}
 
       {#if languages.length > 1 && onLanguage}
         <section>
@@ -502,6 +563,52 @@
     border-color: var(--red);
     color: var(--red);
   }
+  .row.wrap {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 12px;
+    color: var(--steel);
+    cursor: pointer;
+    user-select: none;
+  }
+  /* The drawn checkbox from the parts list; see the note there for why it is
+     not the native control. */
+  .check input {
+    appearance: none;
+    position: relative;
+    width: 9px;
+    height: 9px;
+    margin: 0;
+    border: 1px solid var(--rule);
+    border-radius: 1px;
+    background: var(--sheet);
+    cursor: pointer;
+  }
+  .check input:checked {
+    border-color: var(--red);
+    background: var(--red);
+  }
+  .check input:checked::after {
+    content: "";
+    position: absolute;
+    left: 1px;
+    top: 0;
+    width: 3px;
+    height: 5px;
+    border: solid var(--on-red);
+    border-width: 0 1.5px 1.5px 0;
+    transform: rotate(42deg);
+  }
+  .check input:focus-visible {
+    outline: 2px solid var(--red);
+    outline-offset: 1px;
+  }
+
   .file-btn {
     display: inline-flex;
     align-items: center;

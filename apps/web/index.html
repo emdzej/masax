@@ -4,6 +4,29 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>masax — Mitsubishi parts catalogue</title>
+    <meta
+      name="description"
+      content="A parts catalogue for Mitsubishi vehicles, read from your own copy of the After Sales Application discs. Runs entirely in the browser."
+    />
+
+    <!--
+      Two theme colours, so the browser's own chrome matches the toolbar it sits
+      above rather than fighting it. The manifest carries one value and cannot
+      vary; these can, and the third state — a system-default "auto" — is the
+      one without an explicit `data-theme`, which is why the queries key off
+      `prefers-color-scheme` and not off the attribute.
+    -->
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#17191c" media="(prefers-color-scheme: dark)" />
+
+    <!-- Without this the browser asks for `/favicon.ico` and logs a 404. -->
+    <link rel="icon" href="./icon-192.png" type="image/png" />
+
+    <!-- iOS reads neither the manifest's icons nor its display mode. -->
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="masax" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   </head>
   <body>
     <div id="app"></div>

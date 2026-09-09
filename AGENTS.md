@@ -148,6 +148,33 @@ the Pajero I catalogue and simply not the one for that model. **Before
 concluding two code sets are unrelated, check a pair the data says belongs
 together.**
 
+## `csfs-fsa` cannot create a directory when opened case-insensitively
+
+`dir(path, create)` resolves each segment with `findChild`, which returns null
+when the directory is absent — and then `dir` returns null instead of creating
+it. `fileHandle` has the fallback it is missing (`?? (create ? name : null)`).
+So a **write** to any nested path fails outright when `caseInsensitive: true`,
+which is why the offline copy opens its OPFS target case-sensitively and only
+reads it back case-insensitively. Worth fixing upstream.
+
+It failed as `EPC/DATA1/A/PREF.BIN: could not be created` after writing nothing
+at all, and the copy looked merely slow rather than broken — the only reason it
+was found is that a probe watched `navigator.storage.estimate()` and saw it flat.
+
+## The service worker must never see a range request
+
+`apps/web/src/sw.ts` answers only for URLs it precached, plus navigations, and
+that whitelist is the whole design. A record read in this format is a `Range`
+request; a worker that served one from a cached `200` would hand back the wrong
+bytes at every offset and the reader would decode plausible garbage. A
+"cache-first, network-fallback" default would eventually do exactly that, which
+is why the worker is written out rather than generated, and why the e2e suite
+asserts that range reads still reach the network with the worker in control.
+
+The worker also needs its own `tsconfig.sw.json`: `self` is a
+`ServiceWorkerGlobalScope` there and a `Window` in the app's config, so checking
+it against the DOM lib reports a dozen errors that are not real.
+
 ## A BOM belongs on a CSV and nowhere else
 
 `download()` used to write a UTF-8 BOM unconditionally, which is right for a CSV

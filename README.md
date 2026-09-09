@@ -108,6 +108,19 @@ wrong for most numbers. Dark repaints the plate light-on-dark from the decoded b
 filtering it — a 960x1210 white rectangle is the largest thing on screen, and a
 CSS filter would invert the callout highlights with it.
 
+It installs as a progressive web app, with a service worker that precaches the
+shell and is written by hand rather than generated — the whole of it is a
+whitelist, because a worker that answered a `Range` request from cache would
+return the wrong bytes at every offset and nothing downstream would notice. The
+data is never cached: a picked folder is already local, and a hosted tree is
+left entirely alone.
+
+Settings can also copy the open source into the browser's own storage, which
+removes the one remaining friction — a picked folder loses its permission on
+every reload. It copies only what masax reads, and says what leaving the
+drawings out costs: the plate-to-parts join is the drawing's callouts, so
+without them a plate shows its subgroup's whole list.
+
 A parts bin collects what you have decided to order, keyed by part number and
 carrying the plate it came from, and prints as a pick list or exports as CSV.
 Notes attach your own words to a part number — `MS240141` is M6×10, which the

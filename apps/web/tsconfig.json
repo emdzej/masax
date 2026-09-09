@@ -10,5 +10,12 @@
     "verbatimModuleSyntax": true,
     "types": ["svelte", "vite/client"]
   },
-  "include": ["src/**/*.ts", "src/**/*.svelte"]
+  "include": ["src/**/*.ts", "src/**/*.svelte"],
+  /*
+   * The service worker runs in a worker, not a window: `self` is a
+   * `ServiceWorkerGlobalScope` there and a `Window` here, so checking it
+   * against the DOM lib reports a dozen errors that are not real.
+   * `tsconfig.sw.json` checks it with the right lib.
+   */
+  "exclude": ["src/sw.ts"]
 }

@@ -1,6 +1,6 @@
 {
   "name": "@masax/illust",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": true,
   "description": "The parts drawings: TIFF de-obfuscation and a CCITT Group 4 decoder",
   "license": "PolyForm-Noncommercial-1.0.0",

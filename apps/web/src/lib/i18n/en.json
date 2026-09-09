@@ -261,5 +261,21 @@
     "imported": "Added {{added}}, updated {{updated}}, kept {{kept}}.",
     "importFailed": "That file holds no notes masax can read.",
     "limit": "{{count}} characters left"
+  },
+  "offline": {
+    "title": "A copy in this browser",
+    "lede": "Copies whatever is open now into this browser. Not needed to work offline — a folder on your disk already is — but a copy reopens with no permission to grant and no host to be up. About 430 MB, or 810 MB with the drawings.",
+    "keep": "Keep a copy",
+    "replace": "Replace the copy",
+    "withDrawings": "Include the drawings",
+    "open": "Open the copy",
+    "starting": "Copying…",
+    "progress": "{{files}} files, {{mb}} MB…",
+    "kept": "Kept {{files}} files, {{mb}} MB.",
+    "usage": "{{used}} of {{total}} MB used",
+    "unsupported": "This browser cannot keep a copy.",
+    "delete": "Delete the copy",
+    "deleted": "The copy is deleted.",
+    "drawingsMatter": "Without the drawings a plate shows its whole subgroup's parts rather than its own: which parts belong to which plate is decided by the callouts printed on the drawing."
   }
 }

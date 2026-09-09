@@ -31,7 +31,13 @@ import {
   openDiscs,
   openHttp,
   reopenDiscs,
+  canStoreOffline,
+  clearOffline,
+  keepOffline,
+  offlineQuota,
+  openOffline,
   type Disc,
+  type OfflineProgress,
 } from "./sources.svelte";
 import {
   clearDiscHandles,
@@ -60,6 +66,12 @@ export class AppState {
   conflicts = $state<string[]>([]);
   saved = $state<SavedSource | undefined>(undefined);
   needsPermission = $state(false);
+
+  /** Whether a copy is already in this browser. Looked for once, on boot. */
+  hasOfflineCopy = $state(false);
+  /** Progress of a copy in flight, or the result of the last one. */
+  offlineBusy = $state("");
+  offlineUsage = $state<{ usage: number; quota: number } | undefined>(undefined);
 
   catalogues = $state<CatalogueInfo[]>([]);
   selectedCatalogue = $state<string | undefined>(undefined);
@@ -108,6 +120,10 @@ export class AppState {
     return canPickDirectory();
   }
 
+  get offlineSupported(): boolean {
+    return canStoreOffline();
+  }
+
   get languages(): string[] {
     return [...EUROPE_LANGUAGES];
   }
@@ -119,20 +135,34 @@ export class AppState {
    * survive a reload, and `requestPermission` only works inside a user gesture,
    * so all this can do is *offer* to reopen it.
    */
-  async boot(treeFromUrl?: string): Promise<void> {
+  async boot(dataFromUrl?: string): Promise<void> {
     const settings = loadSettings();
     if (settings.language && this.languages.includes(settings.language)) {
       this.language = settings.language as Language;
     }
     this.saved = settings.source;
 
-    if (treeFromUrl) {
-      await this.openUrl(treeFromUrl, settings);
+    if (dataFromUrl) {
+      await this.openUrl(dataFromUrl, settings);
       return;
     }
     if (settings.source?.kind === "http") {
       await this.openUrl(settings.source.url, settings);
       return;
+    }
+    /*
+     * Looked for on every boot, not only when it is the saved source: it is the
+     * one source that reopens with no gesture and no host, so it is worth
+     * offering as a way in when the saved one cannot be reopened.
+     */
+    if (this.offlineSupported) {
+      this.hasOfflineCopy = Boolean(await openOffline());
+      void this.refreshQuota();
+    }
+
+    if (settings.source?.kind === "offline") {
+      await this.openOfflineCopy(settings);
+      if (this.catalogue) return;
     }
     if (settings.source?.kind === "folders") {
       const handles = await loadDiscHandles();
@@ -162,6 +192,101 @@ export class AppState {
     } finally {
       this.busy = "";
     }
+  }
+
+  /** Open the copy in this browser. No permission, no network. */
+  async openOfflineCopy(settings: Settings = loadSettings()): Promise<void> {
+    this.error = "";
+    this.busy = i18n.t("app.opening");
+    try {
+      const opened = await openOffline();
+      if (!opened) {
+        this.hasOfflineCopy = false;
+        return;
+      }
+      await this.load(opened.fs);
+      // The copy is one tree, not an overlay of discs; showing the discs that
+      // were used to make it would imply they are still being read.
+      this.discs = [];
+      this.conflicts = [];
+      this.saved = { kind: "offline" };
+      this.hasOfflineCopy = true;
+      saveSettings({ ...settings, source: this.saved, language: this.language });
+      this.settingsOpen = false;
+      await this.restore(settings.selection);
+    } catch (cause) {
+      this.error = (cause as Error).message;
+    } finally {
+      this.busy = "";
+    }
+  }
+
+  /**
+   * Copy whatever is open into this browser.
+   *
+   * Progress is reported per file because this takes minutes on a real
+   * catalogue, and a copy that looks frozen is one the user kills by closing
+   * the tab.
+   */
+  async keepCopyOffline(illustrations = false): Promise<void> {
+    const source = this.fs;
+    if (!source) return;
+    this.error = "";
+    this.offlineBusy = i18n.t("offline.starting");
+    try {
+      const result = await keepOffline(source, {
+        illustrations,
+        onProgress: (p: OfflineProgress) => {
+          this.offlineBusy = i18n.t("offline.progress", {
+            files: p.files,
+            mb: Math.round(p.bytes / 1e6),
+          });
+        },
+      });
+      this.hasOfflineCopy = true;
+      this.offlineBusy = i18n.t("offline.kept", {
+        files: result.files,
+        mb: Math.round(result.bytes / 1e6),
+      });
+      await this.refreshQuota();
+    } catch (cause) {
+      this.error = (cause as Error).message;
+      this.offlineBusy = "";
+    }
+  }
+
+  /**
+   * Delete the copy.
+   *
+   * If it is what is currently open, the catalogue is closed with it rather
+   * than left pointing at files that no longer exist — and the settings panel
+   * opens, because there is now no source.
+   */
+  async deleteOfflineCopy(): Promise<void> {
+    this.error = "";
+    this.offlineBusy = "";
+    try {
+      const wasOpen = this.saved?.kind === "offline";
+      await clearOffline();
+      this.hasOfflineCopy = false;
+      this.offlineBusy = i18n.t("offline.deleted");
+      if (wasOpen) {
+        this.catalogue = undefined;
+        this.fs = undefined;
+        this.catalogues = [];
+        this.reset();
+        this.saved = undefined;
+        saveSettings({ ...loadSettings(), source: undefined });
+        this.settingsOpen = true;
+      }
+      await this.refreshQuota();
+    } catch (cause) {
+      this.error = (cause as Error).message;
+    }
+  }
+
+  async refreshQuota(): Promise<void> {
+    this.offlineUsage = await offlineQuota();
   }
 
   private async useHandles(

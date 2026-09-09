@@ -117,6 +117,57 @@ Then point the app at `data/M60`, or serve it:
 masax serve data/M60 -a apps/web/dist
 ```
 
+### Opening a tree straight from a link
+
+`?data=<url>` opens a hosted tree without going through the panel:
+
+```
+https://masax.emdzej.pl/?data=https://example.org/asa/M60/
+```
+
+Handy for handing a colleague a working setup, and for a bookmark on a shop
+machine. The URL is remembered afterwards, so later visits without the
+parameter open the same tree — change or clear it from the settings panel.
+
+### Install it, and work with no network
+
+masax is a progressive web app: your browser will offer to install it, and it
+then opens from the dock or the home screen like any other program.
+
+**Installing is about the software, not the data.** The catalogue is already
+local when you point at a folder — nothing is fetched to read a plate, whether
+masax is installed or not. What installing gets you is a window of its own and a
+shell that loads with the network down.
+
+Two frictions remain, and one of them has a fix:
+
+- **A picked folder loses its permission on reload.** The browser will not
+  re-grant it without a click, so each session starts with **Reopen** in the
+  settings panel. There is no way around that; it is one click and it needs no
+  network.
+- **A hosted tree needs its host.** Nothing to be done while it is the source.
+
+### A copy in this browser
+
+Settings → **Data location** → _A copy in this browser_ copies whatever is open
+now into the browser's own storage. Then **Open the copy**: it reopens with no
+permission to grant and no host to be up, so the reload friction above goes
+away.
+
+Only what masax reads is copied — `EPC`, about **430 MB**, or 810 MB with the
+drawings. The rest of a module is the original Windows program, its dongle
+drivers and its installer, which masax never opens.
+
+**Leaving the drawings out costs more than the pictures.** Which parts belong to
+which plate is decided by the callouts printed on the drawing, so without them a
+plate shows its whole subgroup's parts instead of its own — on a Pajero's
+`13-010` that is 44 rows rather than 11. Tick **Include the drawings** if you
+want plates to behave as they do from the discs.
+
+**Delete the copy** removes it again. Worth knowing: the browser may evict this
+storage under pressure unless it has granted persistence, so treat it as a cache
+of your discs rather than as the only copy.
+
 ## 5. If your browser cannot pick a folder
 
 Use the **HTTP location** field in the same panel and give it the URL of a

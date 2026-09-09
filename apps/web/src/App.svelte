@@ -92,8 +92,16 @@
   }
 
   onMount(() => {
-    const tree = new URLSearchParams(location.search).get("tree") ?? undefined;
-    void app.boot(tree);
+    /*
+     * `?data=<url>` opens a hosted tree, overriding whatever was saved.
+     *
+     * The URL is then *remembered*, so a later visit without the parameter
+     * opens the same tree. That is deliberate — a link handed to a colleague
+     * should set their source up, not just work once — and it is undone from
+     * the settings panel like any other source.
+     */
+    const data = new URLSearchParams(location.search).get("data") ?? undefined;
+    void app.boot(data);
   });
 
   const groupItems = $derived(
@@ -267,6 +275,7 @@
 
 {#if app.settingsOpen}
   <Settings
+    {app}
     saved={app.saved}
     discs={app.discs}
     conflicts={app.conflicts}

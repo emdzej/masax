@@ -281,5 +281,21 @@
     "imported": "Dodano: {{added}}, zaktualizowano: {{updated}}, zachowano: {{kept}}.",
     "importFailed": "Ten plik nie zawiera notatek, które masax potrafi odczytać.",
     "limit": "pozostało znaków: {{count}}"
+  },
+  "offline": {
+    "title": "Kopia w tej przeglądarce",
+    "lede": "Kopiuje to, co jest teraz otwarte, do tej przeglądarki. Nie jest potrzebna do pracy bez sieci — katalog na dysku już nią nie jest — ale kopia otwiera się bez nadawania uprawnień i bez działającego serwera. Około 430 MB, albo 810 MB z rysunkami.",
+    "keep": "Zachowaj kopię",
+    "replace": "Zastąp kopię",
+    "withDrawings": "Dołącz rysunki",
+    "open": "Otwórz kopię",
+    "starting": "Kopiowanie…",
+    "progress": "{{files}} plików, {{mb}} MB…",
+    "kept": "Zachowano {{files}} plików, {{mb}} MB.",
+    "usage": "wykorzystano {{used}} z {{total}} MB",
+    "unsupported": "Ta przeglądarka nie potrafi zapisać kopii.",
+    "delete": "Usuń kopię",
+    "deleted": "Kopia została usunięta.",
+    "drawingsMatter": "Bez rysunków tablica pokazuje części całej podgrupy, a nie własne: o tym, które części należą do której tablicy, decydują odnośniki wydrukowane na rysunku."
   }
 }
