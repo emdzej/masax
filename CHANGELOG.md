@@ -8,6 +8,17 @@ as much as its evidence — the reasoning behind each one is in
 Versions follow [semantic versioning](https://semver.org/). Before 1.0 a minor
 bump is where features land.
 
+## 0.3.1
+
+### Fixed
+
+- The toolbar sat its wordmark and tool icons on the inputs' baseline, which
+  left them pinned to the bottom edge of the bar — the three fields are
+  label-over-input and so twice their height. They centre on the bar now, with
+  the fields still setting that height. The bar's bottom padding was also a
+  hair short of its top, which biased the centre once there was a centre to
+  bias.
+
 ## 0.3.0
 
 ### A parts bin

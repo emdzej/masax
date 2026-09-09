@@ -1,7 +1,7 @@
 {
   "name": "masax",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Browser-based Mitsubishi parts catalogue — a client-side reimplementation of the After Sales Application (ASA)",
   "license": "PolyForm-Noncommercial-1.0.0",
   "repository": {

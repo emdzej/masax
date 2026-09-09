@@ -1,6 +1,6 @@
 {
   "name": "@masax/core",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Shared types for the ASA catalogue format",
   "license": "PolyForm-Noncommercial-1.0.0",
