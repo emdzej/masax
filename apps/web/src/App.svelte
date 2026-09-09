@@ -14,6 +14,9 @@
   import SearchList, { type ListItem } from "./lib/SearchList.svelte";
   import Options from "./lib/Options.svelte";
   import Report from "./lib/Report.svelte";
+  import PartsBin from "./lib/PartsBin.svelte";
+  import NoteEditor from "./lib/NoteEditor.svelte";
+  import { bin } from "./lib/bin.svelte";
   import About from "./lib/About.svelte";
   import Settings from "./lib/Settings.svelte";
   import Toolbar from "./lib/Toolbar.svelte";
@@ -34,7 +37,46 @@
    * be in the DOM for the print stylesheet to reach it — so a clock read during
    * render would tick with every unrelated update.
    */
+  /** The part whose note is being written, if any. */
+  let noteFor = $state<{ partNumber: string; name?: string } | undefined>(undefined);
+
   let printedAt = $state("");
+
+  /**
+   * Which document the print stylesheet should show.
+   *
+   * Two are rendered — the vehicle report and the parts bin — and only one may
+   * reach the paper, so `#app` carries the name of the active one. It is
+   * cleared afterwards so a stray Ctrl-P prints nothing rather than whichever
+   * document happened to be printed last.
+   */
+  let printing = $state<"report" | "bin" | undefined>(undefined);
+
+  /*
+   * `#app` is in `index.html`, not rendered here, so the attribute the print
+   * stylesheet keys off is set imperatively. Both printable documents render
+   * their sections as top-level nodes of this component, which makes them
+   * children of `#app` and so reachable by that stylesheet.
+   */
+  $effect(() => {
+    const root = document.getElementById("app");
+    if (!root) return;
+    if (printing) root.setAttribute("data-print", printing);
+    else root.removeAttribute("data-print");
+  });
+
+  async function print(which: "report" | "bin"): Promise<void> {
+    printedAt = new Date().toLocaleString();
+    printing = which;
+    // A tick, so the stamp and the attribute are in the DOM before the browser
+    // snapshots the page. `window.print` is synchronous and blocking.
+    await tick();
+    try {
+      window.print();
+    } finally {
+      printing = undefined;
+    }
+  }
 
   /**
    * Print the vehicle report.
@@ -46,11 +88,7 @@
   async function printReport(): Promise<void> {
     if (!app.vehicle) return;
     if (!app.optionSet) await app.loadOptions();
-    printedAt = new Date().toLocaleString();
-    // A tick, so the stamp and any freshly loaded options are in the DOM before
-    // the browser snapshots the page.
-    await tick();
-    window.print();
+    await print("report");
   }
 
   onMount(() => {
@@ -116,6 +154,7 @@
     onAbout={() => (aboutOpen = true)}
     onOptions={() => void app.showOptions()}
     onReport={() => void printReport()}
+    onBin={() => (bin.open = true)}
   />
 
   <div class="work">
@@ -159,7 +198,17 @@
         {activePnc}
         vehicle={app.vehicleFit}
         bind:narrowed={app.narrowed}
+        provenance={{
+          catalogue: app.selectedCatalogue,
+          catalogueName: app.catalogues.find((c) => c.id === app.selectedCatalogue)?.name,
+          model: app.selectedModel,
+          plate: app.selectedPlate
+            ? `${app.selectedPlate.mainGroup}-${String(app.selectedPlate.subGroup ?? 0).padStart(3, "0")}`
+            : undefined,
+          vin: app.vehicle ? app.vinInput : undefined,
+        }}
         onSelect={(pnc) => (activePnc = activePnc === pnc ? undefined : pnc)}
+        onNote={(partNumber, name) => (noteFor = { partNumber, name })}
       />
     </main>
   </div>
@@ -188,6 +237,23 @@
     resolved={app.vehicleCatalogue}
     options={app.optionSet}
     {printedAt}
+  />
+{/if}
+
+{#if noteFor}
+  <NoteEditor
+    partNumber={noteFor.partNumber}
+    name={noteFor.name}
+    onClose={() => (noteFor = undefined)}
+  />
+{/if}
+
+{#if bin.open}
+  <PartsBin
+    vehicle={app.vehicle ? app.vinInput : undefined}
+    {printedAt}
+    onPrint={() => void print("bin")}
+    onClose={() => (bin.open = false)}
   />
 {/if}
 

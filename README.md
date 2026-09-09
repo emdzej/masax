@@ -4,7 +4,7 @@ Reverse-engineering the **Mitsubishi After Sales Application** (ASA) — the
 electronic parts catalogue for Mitsubishi vehicles — so its data can be read
 without the original Windows application.
 
-In the spirit of [dialogysx](../dialogysx), which does the same for
+In the spirit of [dialogysx](https://github.com/emdzej/dialogysx), which does the same for
 Renault/Dacia's Dialogys.
 
 ## Status
@@ -107,6 +107,13 @@ words. That is `Intl.PluralRules` territory and a `count === 1` ternary gets it
 wrong for most numbers. Dark repaints the plate light-on-dark from the decoded bitmap rather than
 filtering it — a 960x1210 white rectangle is the largest thing on screen, and a
 CSS filter would invert the callout highlights with it.
+
+A parts bin collects what you have decided to order, keyed by part number and
+carrying the plate it came from, and prints as a pick list or exports as CSV.
+Notes attach your own words to a part number — `MS240141` is M6×10, which the
+catalogue has nowhere to say — and follow that number everywhere it appears.
+Both survive a reload; the notes export, because they are the one thing here
+that cannot be re-read from the discs.
 
 The drawings are Group 4 TIFFs behind a byte obfuscation, so they are decoded in
 the browser rather than converted first — which is what lets the app read a disc

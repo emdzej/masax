@@ -10,6 +10,7 @@
 <script lang="ts">
   import Cog from "@lucide/svelte/icons/cog";
   import Printer from "@lucide/svelte/icons/printer";
+  import ShoppingCart from "@lucide/svelte/icons/shopping-cart";
   import Monitor from "@lucide/svelte/icons/monitor";
   import Moon from "@lucide/svelte/icons/moon";
   import Sun from "@lucide/svelte/icons/sun";
@@ -19,7 +20,9 @@
   import { REPOSITORY, VERSION, releaseUrl } from "./build";
   import { theme } from "./theme.svelte";
   import { i18n, segments, slot } from "./i18n/index.svelte";
-  import { formatAsaDate } from "@masax/core";
+  import ComboBox, { type ComboItem } from "./ComboBox.svelte";
+  import { bin } from "./bin.svelte";
+  import { formatAsaDate, formatAsaDateShort } from "@masax/core";
   import type { CatalogueInfo, VehicleCatalogue, VinRecord } from "@masax/catalogue";
 
   let {
@@ -40,6 +43,7 @@
     onAbout,
     onOptions,
     onReport,
+    onBin,
   }: {
     catalogues: CatalogueInfo[];
     selectedCatalogue?: string;
@@ -58,9 +62,32 @@
     onAbout: () => void;
     onOptions: () => void;
     onReport: () => void;
+    onBin: () => void;
   } = $props();
 
   const t = $derived(i18n.t);
+  /**
+   * The catalogues, each with what tells it apart from its namesakes.
+   *
+   * Sixteen of the 52 share a name: `PAJERO/MONTERO(EUR)` is four entries, the
+   * Pajero 1 through 4. What separates them is the production span, so that is
+   * the hint — it is also what a user is actually choosing between, since the
+   * model codes underneath differ completely between generations.
+   */
+  const catalogueItems = $derived<ComboItem[]>(
+    catalogues.map((info) => {
+      const from = formatAsaDateShort(info.startDate);
+      const to = formatAsaDateShort(info.endDate);
+      return {
+        key: info.id,
+        label: info.name ?? info.id,
+        hint: from || to ? `${from || "?"} – ${to || ""}`.trimEnd() : info.id,
+      };
+    }),
+  );
+
+  const modelItems = $derived<ComboItem[]>(models.map((model) => ({ key: model, label: model })));
+
   /** Names the state the control is in, not the one it will move to. */
   const themeLabel = $derived(t(`theme.current.${theme.choice}`));
 
@@ -130,34 +157,26 @@
 
   <div class="group grow">
     <label class="label" for="catalogue">{t("toolbar.catalogue")}</label>
-    <select
+    <ComboBox
       id="catalogue"
-      value={selectedCatalogue ?? ""}
-      onchange={(e) => onCatalogue(e.currentTarget.value)}
-    >
-      <option value="" disabled>{t("toolbar.choose")}</option>
-      {#each catalogues as info (info.id)}
-        <option value={info.id}>{info.name ?? info.id}</option>
-      {/each}
-    </select>
+      items={catalogueItems}
+      value={selectedCatalogue}
+      placeholder={t("toolbar.choose")}
+      onSelect={onCatalogue}
+    />
   </div>
 
-  <div class="group">
+  <div class="group model">
     <label class="label" for="model">{t("toolbar.model")}</label>
-    <select
+    <ComboBox
       id="model"
-      class="code"
-      value={selectedModel ?? ""}
-      onchange={(e) => onModel(e.currentTarget.value)}
+      items={modelItems}
+      value={selectedModel}
+      placeholder={models.length === 0 ? t("toolbar.none") : t("toolbar.choose")}
       disabled={models.length === 0}
-    >
-      <option value="" disabled>
-        {models.length === 0 ? t("toolbar.none") : t("toolbar.choose")}
-      </option>
-      {#each models as model (model)}
-        <option value={model}>{model}</option>
-      {/each}
-    </select>
+      mono
+      onSelect={onModel}
+    />
   </div>
 
   <!--
@@ -167,7 +186,19 @@
     reach for by muscle memory, so it keeps the corner.
   -->
   <div class="tools">
-    <button class="icon" onclick={() => theme.cycle()} title={themeLabel}>
+    <!--
+      The count is the point of having it in the bar: a bin you have forgotten
+      about is worse than no bin. It reads as a number rather than a dot,
+      because "how many lines" is the thing being tracked.
+    -->
+    <button class="icon basket" class:full={bin.count > 0} onclick={onBin} title={t("bin.openTitle")}>
+      <ShoppingCart size={15} />
+      {#if bin.count > 0}<span class="badge code">{bin.count}</span>{/if}
+      <span class="sr">{t("bin.inBin", { count: bin.count })}</span>
+    </button>
+    <!-- Named classes, not positions: these three are addressed by tests and by
+         the stylesheet, and inserting one shifted every positional selector. -->
+    <button class="icon theme" onclick={() => theme.cycle()} title={themeLabel}>
       <!--
         The icon shows the *current* state rather than the next one. A monitor
         for auto, because auto is "whatever that screen says"; and the label
@@ -178,7 +209,7 @@
       {:else}<Moon size={15} />{/if}
       <span class="sr">{themeLabel}. {t("theme.change")}</span>
     </button>
-    <button class="icon" onclick={onSettings} aria-label={t("toolbar.settings")}>
+    <button class="icon cog" onclick={onSettings} aria-label={t("toolbar.settings")}>
       <Cog size={15} />
     </button>
   </div>
@@ -269,6 +300,27 @@
     margin-left: auto;
     padding-bottom: 0.1rem;
   }
+  .basket {
+    position: relative;
+  }
+  .basket.full {
+    color: var(--red);
+  }
+  .badge {
+    position: absolute;
+    top: -0.1rem;
+    right: -0.15rem;
+    min-width: 0.85rem;
+    padding: 0 0.15rem;
+    border-radius: 0.5rem;
+    background: var(--red);
+    color: var(--on-red);
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1.5;
+    text-align: center;
+  }
+
   /* Present for a screen reader, absent for everyone else. */
   .sr {
     position: absolute;
@@ -334,6 +386,11 @@
     gap: 0.2rem;
     min-width: 0;
   }
+  /* Enough for a model code and its chevron, and no more. */
+  .model {
+    width: 7.5rem;
+  }
+
   .grow {
     flex: 1;
     max-width: 20rem;
@@ -379,22 +436,6 @@
   .vin button:disabled {
     opacity: 0.4;
     cursor: default;
-  }
-
-  select {
-    width: 100%;
-    padding: 0.28rem 0.4rem;
-    border: 1px solid var(--rule);
-    border-radius: var(--r);
-    background: var(--sheet);
-    font-size: 12.5px;
-  }
-  select:focus {
-    outline: none;
-    border-color: var(--red);
-  }
-  select:disabled {
-    color: var(--steel-light);
   }
 
   .icon {

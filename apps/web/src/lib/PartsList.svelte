@@ -23,10 +23,14 @@
 <script lang="ts">
   import Check from "@lucide/svelte/icons/check";
   import Copy from "@lucide/svelte/icons/copy";
+  import ShoppingCartPlus from "@lucide/svelte/icons/shopping-cart-plus";
+  import StickyNote from "@lucide/svelte/icons/sticky-note";
   import Info from "@lucide/svelte/icons/info";
   import { fitsVehicle, type FitFailure, type GroupRef, type PartRow, type VehicleFit } from "@masax/catalogue";
   import { formatAsaDateShort } from "@masax/core";
   import { copyText } from "./clipboard";
+  import { bin } from "./bin.svelte";
+  import { notes } from "./notes.svelte";
   import { i18n } from "./i18n/index.svelte";
 
   let {
@@ -35,7 +39,9 @@
     activePnc,
     vehicle,
     narrowed = $bindable(true),
+    provenance,
     onSelect,
+    onNote,
   }: {
     parts: PartRow[];
     plate?: GroupRef;
@@ -44,7 +50,16 @@
     /** What to narrow by. Absent when no VIN has been decoded. */
     vehicle?: VehicleFit;
     narrowed?: boolean;
+    /** Where these parts came from, recorded on anything added to the bin. */
+    provenance?: {
+      catalogue?: string;
+      catalogueName?: string;
+      model?: string;
+      plate?: string;
+      vin?: string;
+    };
     onSelect?: (pnc: string) => void;
+    onNote?: (partNumber: string, name?: string) => void;
   } = $props();
 
   /** Only offer the switch when a decoded vehicle gives it something to do. */
@@ -85,6 +100,26 @@
    * on two rows of one plate, and a flag would tick both.
    */
   let copied = $state("");
+
+  /**
+   * Add a row to the bin, with the plate's own quantity.
+   *
+   * The Qty column is how many of that part the vehicle has, which is the right
+   * default and usually the right answer — so adding is one click and the
+   * number is adjusted in the bin if it needs to be. A non-numeric quantity
+   * falls back to one rather than to zero: the user asked for the part.
+   */
+  function addToBin(row: PartRow, event: MouseEvent): void {
+    event.stopPropagation();
+    if (!row.partNumber) return;
+    bin.add({
+      partNumber: row.partNumber,
+      pnc: row.pnc,
+      name: row.name,
+      quantity: Number(row.quantity) || 1,
+      ...provenance,
+    });
+  }
 
   async function copy(key: string, value: string, event: MouseEvent): Promise<void> {
     // The row's own click selects the callout; copying is not that.
@@ -190,9 +225,40 @@
               <td class="code part">
                 {part.partNumber ?? ""}
                 {#if part.partNumber}
+                  <!--
+                    Adding is the row's primary action, so it is offered on the
+                    part number — the thing being added — and revealed with the
+                    copy control rather than sitting on all ninety rows at once.
+
+                    A cart with a plus, not a bare plus: at 13px next to a copy
+                    glyph a `+` says "more of something" without saying what,
+                    and it is the same glyph as the destination in the toolbar.
+                  -->
+                  <button
+                    class="reveal add"
+                    class:has={bin.has(part.partNumber)}
+                    onclick={(e) => addToBin(part, e)}
+                    title={t("bin.add", { value: part.partNumber })}
+                    aria-label={t("bin.add", { value: part.partNumber })}
+                  >
+                    <ShoppingCartPlus size={13} />
+                  </button>
+                  <button
+                    class="reveal note"
+                    class:has={Boolean(notes.get(part.partNumber))}
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      onNote?.(part.partNumber!, part.name);
+                    }}
+                    title={notes.get(part.partNumber) ??
+                      t("note.add", { value: part.partNumber })}
+                    aria-label={t("note.edit", { value: part.partNumber })}
+                  >
+                    <StickyNote size={12} />
+                  </button>
                   {@const key = `n${i}`}
                   <button
-                    class="copy"
+                    class="reveal copy"
                     class:done={copied === key}
                     onclick={(e) => void copy(key, part.partNumber!, e)}
                     title={t("parts.copyValue", { value: part.partNumber })}
@@ -208,7 +274,7 @@
                 {#if part.name}
                   {@const key = `d${i}`}
                   <button
-                    class="copy"
+                    class="reveal copy"
                     class:done={copied === key}
                     onclick={(e) => void copy(key, part.name!, e)}
                     title={t("parts.copyValue", { value: part.name })}
@@ -218,6 +284,14 @@
                   </button>
                 {/if}
                 {#if part.feature}<span class="feature">{part.feature}</span>{/if}
+                <!--
+                  Shown, not hidden behind the icon. "Accessible wherever the
+                  part is displayed" is the point of a note: a hover-only note
+                  is one you have to already know is there.
+                -->
+                {#if notes.get(part.partNumber)}
+                  <span class="note-text">{notes.get(part.partNumber)}</span>
+                {/if}
               </td>
               <td class="code period">{dates(part)}</td>
               <td class="applies">
@@ -272,7 +346,7 @@
    * plate. Keyboard focus is unaffected by it, so tabbing in still reveals
    * them through `:focus-within`.
    */
-  .copy {
+  .reveal {
     display: inline-flex;
     vertical-align: -1px;
     margin-left: 0.3rem;
@@ -284,26 +358,51 @@
     pointer-events: none;
     transition: opacity 90ms linear;
   }
-  tr.linked .copy,
-  tr:focus-within .copy {
+  tr.linked .reveal,
+  tr:focus-within .reveal {
     opacity: 1;
     pointer-events: auto;
   }
   @media (hover: hover) and (pointer: fine) {
-    tr:hover .copy {
+    tr:hover .reveal {
       opacity: 1;
       pointer-events: auto;
     }
   }
-  .copy:hover {
+  .reveal:hover {
     color: var(--red);
   }
-  .copy.done {
+  /* A part with a note keeps its marker visible, so the note can be found
+     again without hovering every row. */
+  .note.has {
+    opacity: 1;
+    pointer-events: auto;
+    color: var(--red);
+  }
+  .note-text {
+    display: block;
+    margin-top: 0.1rem;
+    padding-left: 0.4rem;
+    border-left: 2px solid var(--red);
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--steel);
+    white-space: pre-wrap;
+  }
+
+  /* Already in the bin: shown always, so a second pass down the plate does not
+     add a part twice by accident. */
+  .add.has {
+    opacity: 1;
+    pointer-events: auto;
+    color: var(--red);
+  }
+  .reveal.done {
     color: var(--red);
     opacity: 1;
   }
   @media (prefers-reduced-motion: reduce) {
-    .copy {
+    .reveal {
       transition: none;
     }
   }

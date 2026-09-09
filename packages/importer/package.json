@@ -1,6 +1,6 @@
 {
   "name": "@masax/importer",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Recognise mounted ASA discs, read several as one tree, and copy them into one",
   "license": "PolyForm-Noncommercial-1.0.0",

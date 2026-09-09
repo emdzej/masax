@@ -170,7 +170,8 @@
     "title": "Settings",
     "tab": {
       "data": "Data location",
-      "ui": "User interface"
+      "ui": "User interface",
+      "notes": "Notes"
     },
     "lede": "masax reads a Mitsubishi ASA catalogue from your own copy. Mount the discs and point it at them — nothing is uploaded, extracted or converted.",
     "discs": "Discs and folders",
@@ -209,5 +210,56 @@
     "opening": "Opening the catalogue…",
     "readingParts": "Reading the parts…",
     "lookingUp": "Looking up the vehicle…"
+  },
+  "bin": {
+    "title": "Parts bin",
+    "openTitle": "Parts bin",
+    "empty": "Nothing in the bin yet. Add a part from a plate's list.",
+    "add": "Add {{value}} to the bin",
+    "inBin": "{{count}} in the bin",
+    "lines_one": "{{count}} line",
+    "lines_other": "{{count}} lines",
+    "pieces_one": "{{count}} piece",
+    "pieces_other": "{{count}} pieces",
+    "quantity": "Qty",
+    "remove": "Remove {{value}} from the bin",
+    "clear": "Empty the bin",
+    "print": "Print",
+    "csv": "CSV",
+    "csvFile": "masax-parts-bin.csv",
+    "from": "From",
+    "printedFor": "Vehicle",
+    "column": {
+      "partNumber": "Part number",
+      "pnc": "PNC",
+      "name": "Name",
+      "quantity": "Qty",
+      "catalogue": "Catalogue",
+      "model": "Model",
+      "plate": "Plate",
+      "vin": "VIN",
+      "note": "Note"
+    },
+    "footer": "Collected with masax from the After Sales Application catalogue. Check each number against the plate before ordering."
+  },
+  "note": {
+    "title": "Note",
+    "add": "Add a note to {{value}}",
+    "edit": "Note on {{value}}",
+    "placeholder": "e.g. M6 × 10 mm, or which side it fits",
+    "save": "Save",
+    "delete": "Delete the note",
+    "count_one": "{{count}} note",
+    "count_other": "{{count}} notes",
+    "none": "No notes yet. Add one from a part in a plate's list.",
+    "tab": "Notes",
+    "lede": "Your own words about a part number, shown wherever that number appears. They live in this browser only, so export them if they matter.",
+    "export": "Export",
+    "import": "Import",
+    "file": "masax-notes.json",
+    "clear": "Delete all notes",
+    "imported": "Added {{added}}, updated {{updated}}, kept {{kept}}.",
+    "importFailed": "That file holds no notes masax can read.",
+    "limit": "{{count}} characters left"
   }
 }

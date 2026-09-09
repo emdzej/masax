@@ -77,9 +77,12 @@ i18next.init({
     // double-encode a quote in a part name.
     escapeValue: false,
   },
-  // A missing key should be loud in development and inert in a build, never a
-  // raw dotted path shown to a user.
   returnNull: false,
+  // A missing key renders as its own dotted path, which is how `settings.tab.notes`
+  // once reached the interface as literal text. `i18n.test.ts` now walks every
+  // static `t("...")` call in the client and fails if the key is absent, which
+  // is a better guarantee than any runtime fallback.
+  parseMissingKeyHandler: (key) => key,
 });
 
 class I18n {

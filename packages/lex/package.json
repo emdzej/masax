@@ -1,6 +1,6 @@
 {
   "name": "@masax/lex",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "LexCom storage engine: .ddm/.fdt schemas, sorted .pnt indexes, variable-length .bin records",
   "license": "PolyForm-Noncommercial-1.0.0",

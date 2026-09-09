@@ -16,7 +16,10 @@
   import Link from "@lucide/svelte/icons/link";
   import Plus from "@lucide/svelte/icons/plus";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
+  import Download from "@lucide/svelte/icons/download";
+  import StickyNote from "@lucide/svelte/icons/sticky-note";
   import Trash2 from "@lucide/svelte/icons/trash-2";
+  import Upload from "@lucide/svelte/icons/upload";
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import X from "@lucide/svelte/icons/x";
   import Diamond from "./Diamond.svelte";
@@ -24,6 +27,8 @@
   import type { SavedSource } from "./settings";
   import { LOCALES, i18n, segments, slot, type LocaleChoice } from "./i18n/index.svelte";
   import { THEME_CHOICES, theme } from "./theme.svelte";
+  import { normalise, notes } from "./notes.svelte";
+  import { download } from "./bin.svelte";
 
   let {
     saved,
@@ -88,9 +93,42 @@
    * thing to do then, which is point masax at some data, and offering a
    * preferences tab first would be an invitation to the wrong job.
    */
-  type Tab = "data" | "ui";
+  type Tab = "data" | "ui" | "notes";
   let tab = $state<Tab>("data");
-  const TABS: Tab[] = ["data", "ui"];
+  const TABS: Tab[] = ["data", "ui", "notes"];
+
+  /** What the last import did, or why it did nothing. */
+  let importReport = $state("");
+
+  /**
+   * Read a notes file and merge it in.
+   *
+   * A file input rather than drag-and-drop or a paste box: it is the one route
+   * that works the same on every browser and on a touch screen, and this is a
+   * once-in-a-while action.
+   */
+  async function importNotes(event: Event): Promise<void> {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    try {
+      // A leading BOM is stripped: a file that has been through a spreadsheet or
+      // a Windows editor may carry one, and `JSON.parse` refuses it.
+      const text = (await file.text()).replace(/^\ufeff/, "");
+      const incoming = normalise(JSON.parse(text));
+      if (Object.keys(incoming).length === 0) {
+        importReport = t("note.importFailed");
+        return;
+      }
+      const { added, updated, kept } = notes.merge(incoming);
+      importReport = t("note.imported", { added, updated, kept });
+    } catch {
+      importReport = t("note.importFailed");
+    } finally {
+      // Cleared, so choosing the same file twice fires the change event again.
+      input.value = "";
+    }
+  }
 
   const hostedNote = $derived(
     segments(t("settings.hostedNote", { manifest: slot("manifest"), command: slot("command") })),
@@ -292,6 +330,61 @@
       </section>
     </div>
 
+    <div class="body" class:hidden={tab !== "notes"}>
+      <section>
+        <div class="head">
+          <span class="label">{t("note.tab")}</span>
+          <span class="count code">{t("note.count", { count: notes.count })}</span>
+        </div>
+        <p class="note">{t("note.lede")}</p>
+
+        <div class="row">
+          <button onclick={() => download(t("note.file"), notes.toJson(), { type: "application/json" })}>
+            <Download size={13} /> {t("note.export")}
+          </button>
+          <!--
+            A label wrapping a hidden input, so the control looks like the button
+            beside it. `accept` is a hint, not a filter — the file is validated
+            when it is read, because a hint can be ignored.
+          -->
+          <label class="file-btn">
+            <Upload size={13} /> {t("note.import")}
+            <input type="file" accept="application/json,.json" onchange={importNotes} />
+          </label>
+          {#if notes.count > 0}
+            <button class="text-btn" onclick={() => notes.clear()}>
+              <Trash2 size={12} /> {t("note.clear")}
+            </button>
+          {/if}
+        </div>
+        {#if importReport}<p class="note">{importReport}</p>{/if}
+      </section>
+
+      {#if notes.count === 0}
+        <p class="note">{t("note.none")}</p>
+      {:else}
+        <ul class="notes">
+          {#each notes.all as entry (entry.partNumber)}
+            <li>
+              <StickyNote size={12} />
+              <div>
+                <strong class="code">{entry.partNumber}</strong>
+                <span>{entry.text}</span>
+              </div>
+              <button
+                class="icon"
+                onclick={() => notes.remove(entry.partNumber)}
+                aria-label={t("note.delete")}
+                title={t("note.delete")}
+              >
+                <Trash2 size={13} />
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
+
     <!--
       The footer follows the tab. Forget and Open catalogue act on the data, so
       they have no meaning beside a theme picker.
@@ -324,7 +417,9 @@
         reader to wonder whether their choice stuck.
       -->
       <footer>
-        <p class="note">{t("settings.appliesAtOnce")}</p>
+        <!-- The reassurance is about the language and theme controls, so it
+             belongs to that tab and not to the notes one. -->
+        {#if tab === "ui"}<p class="note">{t("settings.appliesAtOnce")}</p>{/if}
         <div class="spacer"></div>
         <button class="primary" onclick={onClose}>{t("settings.done")}</button>
       </footer>
@@ -407,6 +502,64 @@
     border-color: var(--red);
     color: var(--red);
   }
+  .file-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--rule);
+    border-radius: var(--r);
+    background: var(--sheet);
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .file-btn:hover {
+    border-color: var(--red);
+    color: var(--red);
+  }
+  /* Hidden but focusable, so the keyboard can still reach the file picker. */
+  .file-btn input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+  }
+  .file-btn:focus-within {
+    outline: 2px solid var(--red);
+    outline-offset: 1px;
+  }
+  .notes {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+  .notes li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.45rem;
+    padding: 0.35rem 0.4rem;
+    border: 1px solid var(--rule-soft);
+    border-radius: var(--r);
+  }
+  .notes li div {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
+  }
+  .notes strong {
+    font-size: 12px;
+  }
+  .notes span {
+    font-size: 11.5px;
+    color: var(--steel);
+    white-space: pre-wrap;
+  }
+
   .choices button.on {
     border-color: var(--red);
     background: var(--red-wash);

@@ -148,6 +148,22 @@ the Pajero I catalogue and simply not the one for that model. **Before
 concluding two code sets are unrelated, check a pair the data says belongs
 together.**
 
+## A BOM belongs on a CSV and nowhere else
+
+`download()` used to write a UTF-8 BOM unconditionally, which is right for a CSV
+— Excel reads a BOM-less UTF-8 file as the system code page and turns Polish
+headings into mojibake — and wrong for everything else: `JSON.parse` refuses a
+file that starts with one, so the notes export could not be imported back. It is
+opt-in now, and the round trip is a test.
+
+## A component and a store cannot differ only in case
+
+`Bin.svelte` beside `bin.svelte.ts` makes `./bin.svelte` ambiguous on a
+case-insensitive filesystem, and `tsc` reports it as "already included file name
+differs only in casing". Components are PascalCase and stores are lowercase, so
+a store named `x` forbids a component named `X` — the component here is
+`PartsBin.svelte`.
+
 ## Two languages, and they are not the same one
 
 The catalogue carries its own text in four languages through `Desc`; the

@@ -11,7 +11,7 @@
  * the wrong bytes, and `HttpRangeReader` is written to reject that rather than
  * trust it. This test is also what proves the range path works at all.
  */
-import { createReadStream, existsSync, readdirSync, statSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { extname, join, normalize } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -102,6 +102,30 @@ function serve(roots: { prefix: string; dir: string }[]): Promise<{ server: Serv
   });
 }
 
+/**
+ * Pick a value from one of the toolbar comboboxes.
+ *
+ * They are no longer `<select>`s — 16 of the 52 catalogues share a name, so the
+ * list needs filtering and a hint per row. Typing the key filters to it: the
+ * filter matches the key as well as the label, which is what makes a catalogue
+ * id usable here.
+ */
+async function choose(
+  page: import("playwright-core").Page,
+  which: "catalogue" | "model",
+  key: string,
+): Promise<void> {
+  const field = page.locator(`input#${which}`);
+  await field.click();
+  await field.fill(key);
+  await page.locator(`#${which}-list li[role="option"]`).first().click();
+  await expect.poll(() => field.getAttribute("data-value"), { timeout: 30_000 }).toBe(key);
+}
+
+/** What a combobox currently holds, as its key rather than its label. */
+const chosen = (page: import("playwright-core").Page, which: "catalogue" | "model") =>
+  page.locator(`input#${which}`).getAttribute("data-value");
+
 describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
   let server: Server;
   let base: string;
@@ -116,8 +140,17 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
     ]));
     const { chromium } = await import("playwright-core");
     browser = await chromium.launch({ channel: "chrome" });
-    context = await browser.newContext();
+    context = await browser.newContext({ acceptDownloads: true });
     page = await context.newPage();
+    // `window.print` blocks on a dialog, so it is stubbed and what it *would*
+    // have printed is recorded instead. The stylesheet is the thing under test.
+    await page.addInitScript(() => {
+      window.print = () => {
+        (window as unknown as { __printed?: string | null }).__printed = document
+          .getElementById("app")
+          ?.getAttribute("data-print");
+      };
+    });
     const problems: string[] = [];
     page.on("pageerror", (error) => problems.push(error.message));
     page.on("response", (response) => {
@@ -135,7 +168,7 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
     await page.getByPlaceholder(/example\.org/).fill(`${base}${modulePath(DATA!)}`);
     await page.getByRole("button", { name: "Open", exact: true }).click();
     try {
-      await page.locator("select#catalogue").waitFor({ timeout: 90_000 });
+      await page.locator("input#catalogue").waitFor({ timeout: 90_000 });
     } catch (cause) {
       // Surface what the page actually said rather than just the timeout.
       const shown = await page.locator("body").innerText();
@@ -152,14 +185,18 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
   });
 
   it("lists the catalogues from CInfo", async () => {
-    const options = page.locator("select#catalogue option");
-    await expect.poll(() => options.count(), { timeout: 30_000 }).toBeGreaterThan(10);
-    expect(await options.nth(1).textContent()).toBeTruthy();
+    await page.locator("input#catalogue").click();
+    const options = page.locator('#catalogue-list li[role="option"]');
+    await expect.poll(() => options.count(), { timeout: 30_000 }).toBe(52);
+    // Every row carries the production span, because sixteen of the 52 share a
+    // name and the span is what separates them.
+    expect(await options.first().locator(".hint").textContent()).toMatch(/\d{4}-\d{2}/);
+    await page.keyboard.press("Escape");
   });
 
   it("walks catalogue, model, group and plate to a drawing and its parts", async () => {
-    await page.selectOption("select#catalogue", "B6037609A");
-    await page.selectOption("select#model", "L042G");
+    await choose(page, "catalogue", "B6037609A");
+    await choose(page, "model", "L042G");
     await page.getByRole("button", { name: /^13\s/ }).click();
     // 13-010 is FUEL TANK; its drawing is 113_0103KC1A0T.
     await page.getByRole("button", { name: /010\s+FUEL TANK/ }).click();
@@ -227,8 +264,8 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
     // 13-010 on a V25W is three plates over one run of 70 rows: a filler pipe
     // and two tank-and-tube variants. Nothing in BGroup separates them, so the
     // drawing does — its callouts are its share of the list.
-    await page.selectOption("select#catalogue", "B60356A4A");
-    await page.selectOption("select#model", "V25W");
+    await choose(page, "catalogue", "B60356A4A");
+    await choose(page, "model", "V25W");
     await page.getByRole("button", { name: /^13\s/ }).click();
 
     const plates = page.locator("section.rail").last().locator("button.row");
@@ -298,7 +335,9 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
   });
 
   it("cycles the theme, remembers it, and repaints the plate", async () => {
-    const button = page.locator(".tools button.icon").first();
+    // By name: the basket sits before it now, and a positional selector here
+    // silently clicked that instead, opening a dialog over everything after.
+    const button = page.locator(".tools button.theme");
     const attribute = () =>
       page.evaluate(() => document.documentElement.getAttribute("data-theme"));
     // The paper of the plate, read off the canvas rather than the CSS: the
@@ -337,10 +376,10 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
 
   it("keeps the settings cog against the right edge of the toolbar", async () => {
     const bar = (await page.locator("header.bar").boundingBox())!;
-    const cog = (await page.locator(".tools button.icon").last().boundingBox())!;
+    const cog = (await page.locator(".tools button.cog").boundingBox())!;
     expect(bar.x + bar.width - (cog.x + cog.width)).toBeLessThan(20);
     // and the theme control sits to its left, not the other way round
-    const swatch = (await page.locator(".tools button.icon").first().boundingBox())!;
+    const swatch = (await page.locator(".tools button.theme").boundingBox())!;
     expect(swatch.x).toBeLessThan(cog.x);
   });
 
@@ -348,13 +387,11 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
     // The vehicle from the VIN tests below is a V25W built 1994-03. On the
     // filler-pipe plate that leaves one row per callout: the later part numbers
     // for 05014, 05078, 05079, 05114, 05178 and 05292 are all later periods.
-    await page.selectOption("select#catalogue", "B60356A4A");
-    await page.selectOption("select#model", "V25W");
+    await choose(page, "catalogue", "B60356A4A");
+    await choose(page, "model", "V25W");
     await page.locator("input#vin").fill("JMB0RV250RJ000188");
     await page.getByRole("button", { name: "Decode" }).click();
-    await expect
-      .poll(() => page.locator("select#model").inputValue(), { timeout: 30_000 })
-      .toBe("V25W");
+    await expect.poll(() => chosen(page, "model"), { timeout: 30_000 }).toBe("V25W");
     await page.getByRole("button", { name: /^13\s/ }).click();
     // By name, not by position: decoding the VIN reopens the catalogue and
     // model, which rebuilds this list, and an index taken before that resolves
@@ -421,13 +458,16 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
     expect(await report.count()).toBe(1);
     expect(await report.evaluate((el) => getComputedStyle(el).display)).toBe("none");
 
-    // `window.print` would block on a dialog, so it is stubbed and the media
-    // switched by hand. What matters is the stylesheet, not the dialog.
-    await page.addInitScript(() => {
-      window.print = () => {};
-    });
+    // `window.print` is stubbed in `beforeAll`; what it would have printed is
+    // recorded, so the click is safe and checkable.
     await page.getByRole("button", { name: "Report" }).click();
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { __printed?: string }).__printed))
+      .toBe("report");
 
+    // The attribute is cleared as soon as `window.print` returns, so it is set
+    // by hand to inspect what the stylesheet does at the moment of printing.
+    await page.evaluate(() => document.getElementById("app")?.setAttribute("data-print", "report"));
     await page.emulateMedia({ media: "print" });
     try {
       expect(await report.evaluate((el) => getComputedStyle(el).display)).toBe("block");
@@ -453,6 +493,7 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
       }
     } finally {
       await page.emulateMedia({ media: "screen" });
+      await page.evaluate(() => document.getElementById("app")?.removeAttribute("data-print"));
     }
   });
 
@@ -475,13 +516,14 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
 
       await page2.getByPlaceholder(/example\.org/).fill(`${base}${modulePath(DATA!)}`);
       await page2.getByRole("button", { name: "Otwórz", exact: true }).click();
-      await page2.locator("select#catalogue").waitFor({ timeout: 90_000 });
+      await page2.locator("input#catalogue").waitFor({ timeout: 90_000 });
 
       // Two tabs, named in Polish, and the override switches the whole thing.
-      await page2.locator(".tools button.icon").last().click();
+      await page2.locator(".tools button.cog").click();
       expect(await page2.locator("button.tab").allTextContents()).toEqual([
         "Lokalizacja danych",
         "Interfejs",
+        "Notatki",
       ]);
       await page2.getByRole("tab", { name: "Interfejs" }).click();
       await page2.getByRole("button", { name: "English", exact: true }).click();
@@ -489,6 +531,7 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
       expect(await page2.locator("button.tab").allTextContents()).toEqual([
         "Data location",
         "User interface",
+        "Notes",
       ]);
       // Remembered, so the next visit opens in the chosen language rather than
       // going back to the browser's.
@@ -511,12 +554,10 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
       await page2.goto(base);
       await page2.getByPlaceholder(/example\.org/).fill(`${base}${modulePath(DATA!)}`);
       await page2.getByRole("button", { name: "Otwórz", exact: true }).click();
-      await page2.locator("select#catalogue").waitFor({ timeout: 90_000 });
+      await page2.locator("input#catalogue").waitFor({ timeout: 90_000 });
       await page2.locator("input#vin").fill("JMB0RV250RJ000188");
       await page2.getByRole("button", { name: "Dekoduj" }).click();
-      await expect
-        .poll(() => page2.locator("select#model").inputValue(), { timeout: 30_000 })
-        .toBe("V25W");
+      await expect.poll(() => chosen(page2, "model"), { timeout: 30_000 }).toBe("V25W");
       await page2.getByRole("button", { name: /^13\s/ }).click();
       await page2
         .locator("section.rail")
@@ -543,6 +584,142 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
       await polish.close();
     }
   }, 120_000);
+
+  it("collects parts in the bin, prints them and exports CSV", async () => {
+    // The plate from the narrowing test above is still open: 11 rows for a
+    // V25W built 1994-03.
+    const rows = page.locator("section.panel tbody tr");
+    await expect.poll(() => rows.count(), { timeout: 30_000 }).toBe(11);
+
+    const add = async (at: number) => {
+      await rows.nth(at).hover();
+      await rows.nth(at).locator("button.add").click();
+    };
+    await add(0); // MA152319, qty 01
+    await add(1); // MB927991, qty 01
+    await add(4); // MS240141, qty 04
+    // Adding a number already in the bin raises its quantity rather than
+    // opening a second line: a bolt is a bolt.
+    await add(0);
+
+    await expect.poll(() => page.locator(".basket .badge").textContent()).toBe("3");
+    await page.locator("button.basket").click();
+
+    const lines = page.locator('[role="dialog"] tbody tr');
+    await expect.poll(() => lines.count(), { timeout: 10_000 }).toBe(3);
+    // 2 + 1 + 4: the quantity defaults to what the plate fits.
+    const summary = (await page.locator('[role="dialog"] header .count').textContent()) ?? "";
+    expect(summary.replace(/\s+/g, " ").trim()).toBe("3 lines · 7 pieces");
+    expect(await page.locator('[role="dialog"] input.qty').first().inputValue()).toBe("2");
+
+    // The same copy controls as the parts list.
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await lines.first().hover();
+    await lines.first().locator("button.copy").first().click();
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe("MA152319");
+
+    // CSV: every field quoted, and the provenance carried.
+    const pending = page.waitForEvent("download");
+    await page.getByRole("button", { name: "CSV" }).click();
+    const file = await pending;
+    expect(file.suggestedFilename()).toBe("masax-parts-bin.csv");
+    const csv = readFileSync((await file.path())!, "utf8");
+    // A BOM on purpose, so Excel reads it as UTF-8 rather than the system code
+    // page — without it Polish headings arrive as mojibake.
+    expect(csv.codePointAt(0)).toBe(0xfeff);
+    const [header, first] = csv.slice(1).split("\r\n");
+    expect(header).toBe(
+      '"Part number","PNC","Name","Qty","Catalogue","Model","Plate","VIN","Note"',
+    );
+    // The name contains a comma, which is why every field is quoted. The note
+    // column is empty here and carries text in the notes test below.
+    expect(first).toContain('"MA152319","05007","GASKET,FUEL FILLER NECK","2"');
+    expect(first).toContain('"V25W","13-010","JMB0RV250RJ000188",""');
+
+    // Printing names the bin, not the vehicle report, and clears afterwards.
+    await page.getByRole("button", { name: "Print" }).click();
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { __printed?: string }).__printed))
+      .toBe("bin");
+    expect(
+      await page.evaluate(() => document.getElementById("app")?.getAttribute("data-print")),
+    ).toBeNull();
+
+    // Removing a line, and emptying.
+    await lines.first().locator("button.icon").click();
+    await expect.poll(() => lines.count()).toBe(2);
+    await page.getByRole("button", { name: "Empty the bin" }).click();
+    await expect.poll(() => page.locator(".basket .badge").count()).toBe(0);
+    expect(await page.locator('[role="dialog"] .none').textContent()).toContain(
+      "Nothing in the bin",
+    );
+    // Escape, not a click on "Close": the backdrop carries that label too, and
+    // leaving this dialog open blocks every test after it.
+    await page.keyboard.press("Escape");
+    await expect.poll(() => page.locator('[role="dialog"]').count()).toBe(0);
+  });
+
+  it("notes a part number, and shows it wherever the part appears", async () => {
+    // The filler-pipe plate is open from the bin test above.
+    const rows = page.locator("section.panel tbody tr");
+    await expect.poll(() => rows.count(), { timeout: 30_000 }).toBe(11);
+
+    // MS240141 is row 4: BOLT,FUEL FILLER PIPE, qty 04.
+    await rows.nth(4).hover();
+    await rows.nth(4).locator("button.note").click();
+    await page.locator('[role="dialog"] textarea').fill("bolt is M6x10mm");
+    await page.getByRole("button", { name: "Save" }).click();
+
+    // Shown inline, not hidden behind the icon — a note you have to hover to
+    // find is a note you have to already know about.
+    await expect
+      .poll(() => rows.nth(4).locator(".note-text").textContent())
+      .toBe("bolt is M6x10mm");
+    // And its marker stays visible so the note can be found again.
+    expect(await rows.nth(4).locator("button.note.has").count()).toBe(1);
+
+    // It travels with the part: into the bin, the CSV and the printed list.
+    await rows.nth(4).hover();
+    await rows.nth(4).locator("button.add").click();
+    await page.locator("button.basket").click();
+    const line = page.locator('[role="dialog"] tbody tr').first();
+    await expect.poll(() => line.locator(".note-text").textContent()).toBe("bolt is M6x10mm");
+
+    const pending = page.waitForEvent("download");
+    await page.getByRole("button", { name: "CSV" }).click();
+    const csv = readFileSync((await (await pending).path())!, "utf8");
+    expect(csv.split("\r\n")[0]).toContain('"Note"');
+    expect(csv).toContain('"bolt is M6x10mm"');
+    await page.keyboard.press("Escape");
+
+    // Export, and a round trip back through import.
+    await page.locator(".tools button.cog").click();
+    await page.getByRole("tab", { name: "Notes" }).click();
+    expect(await page.locator('[role="dialog"] .notes li').count()).toBe(1);
+    const exported = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export" }).click();
+    const file = await exported;
+    expect(file.suggestedFilename()).toBe("masax-notes.json");
+    const json = JSON.parse(readFileSync((await file.path())!, "utf8"));
+    expect(json.kind).toBe("masax.notes");
+    expect(json.notes.MS240141.text).toBe("bolt is M6x10mm");
+
+    // Deleting, then importing the file back.
+    await page.getByRole("button", { name: "Delete all notes" }).click();
+    await expect.poll(() => page.locator('[role="dialog"] .notes li').count()).toBe(0);
+    await page.locator('[role="dialog"] .file-btn input').setInputFiles((await file.path())!);
+    await expect.poll(() => page.locator('[role="dialog"] .notes li').count()).toBe(1);
+    expect(await page.locator('[role="dialog"] .notes span').textContent()).toBe("bolt is M6x10mm");
+
+    // Leave nothing behind for the tests after this one.
+    await page.getByRole("button", { name: "Delete all notes" }).click();
+    await page.keyboard.press("Escape");
+    await expect.poll(() => page.locator('[role="dialog"]').count()).toBe(0);
+    await page.locator("button.basket").click();
+    await page.getByRole("button", { name: "Empty the bin" }).click();
+    await page.keyboard.press("Escape");
+    await expect.poll(() => page.locator('[role="dialog"]').count()).toBe(0);
+  });
 
   it("filters the group list by number and by name", async () => {
     const groups = page.locator("section.rail").first();
@@ -577,10 +754,8 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
     // enough to get to a parts list.
     await page.locator("input#vin").fill("JMB0RV250RJ000188");
     await page.getByRole("button", { name: "Decode" }).click();
-    await expect
-      .poll(() => page.locator("select#catalogue").inputValue(), { timeout: 30_000 })
-      .toBe("B60356A4A");
-    expect(await page.locator("select#model").inputValue()).toBe("V25W");
+    await expect.poll(() => chosen(page, "catalogue"), { timeout: 30_000 }).toBe("B60356A4A");
+    expect(await chosen(page, "model")).toBe("V25W");
     // and it says how it decided
     expect(await page.locator(".strip").textContent()).toContain("PAJERO/MONTERO");
   });

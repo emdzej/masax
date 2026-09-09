@@ -246,6 +246,33 @@ Polish interface over an English parts list is the normal case, not a fault.
 The theme control also sits in the toolbar, left of the gear, for a quick
 switch.
 
+### The parts bin
+
+The cart in the toolbar is a bin you fill as you work. Point at a row in a
+plate's list and a cart icon appears next to the part number; clicking it adds
+the part with the quantity the plate fits. Adding a number you already have
+raises its quantity rather than opening a second line — a bolt is a bolt.
+
+The bin carries where each part came from: catalogue, model, plate, and the VIN
+that was in the toolbar. That is what makes a printed list usable by somebody
+else. Open it from the toolbar to change quantities, remove lines, **print** it
+as a pick list, or **export CSV** for a spreadsheet or an order form.
+
+It survives a reload, because a bin assembled across a dozen plates is real work.
+
+### Notes on a part
+
+`MS240141` is `BOLT,FUEL FILLER PIPE` in the catalogue, which does not tell you
+it is M6×10. Point at the row and click the note icon to write that down; the
+note then appears under that part number **everywhere it shows up** — every
+plate that lists it, the bin, the printed pick list and the CSV.
+
+Notes live in this browser only, and a cleared cache takes them with it.
+Everything else in masax can be re-read from the discs; these cannot. The
+**Notes** tab in settings lists them all, and exports and imports them as a
+JSON file — importing merges rather than replaces, so it is safe to take a
+colleague's notes without losing your own.
+
 ### Report, and copying
 
 - **Report**, on the vehicle strip, prints everything the data holds about the

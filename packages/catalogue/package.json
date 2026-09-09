@@ -1,6 +1,6 @@
 {
   "name": "@masax/catalogue",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "ASA domain: catalogues, groups, plates, parts, VIN decoding, supersession",
   "license": "PolyForm-Noncommercial-1.0.0",

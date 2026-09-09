@@ -11,6 +11,8 @@ import { describe, expect, it } from "vitest";
 import i18next from "i18next";
 import en from "./en.json";
 import pl from "./pl.json";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { segments, slot } from "./slots.js";
 
 type Tree = { [key: string]: string | Tree };
@@ -136,6 +138,110 @@ describe("translations", () => {
     });
     expect(instance.t("parts.rows", { count: 1 })).toBe("1 row");
     expect(instance.t("parts.rows", { count: 8 })).toBe("8 rows");
+  });
+});
+
+/**
+ * Every key the client asks for, against the ones that exist.
+ *
+ * A missing key renders as its own dotted path: `settings.tab.notes` reached
+ * the interface as literal text exactly once, which is once more than it should
+ * have. Only static `t("literal")` calls can be checked this way — the
+ * dynamic ones are `t(`prefix.${value}`)`, where the prefix is asserted
+ * separately below.
+ */
+describe("keys the client uses", () => {
+  const dir = new URL("../../", import.meta.url).pathname;
+  const files = readdirSync(dir, { recursive: true, encoding: "utf8" }).filter(
+    (f) =>
+      // The i18n directory is the machinery, not a call site, and its own
+      // prose contains `t("...")` as an example — which this scanner read as a
+      // key named `...`.
+      !f.includes("i18n/") &&
+      (f.endsWith(".svelte") || (f.endsWith(".ts") && !f.endsWith(".test.ts"))),
+  );
+
+  const used = new Map<string, string>();
+  for (const file of files) {
+    const source = readFileSync(join(dir, file), "utf8");
+    for (const match of source.matchAll(/\bt\(\s*"([\w.]+)"/g)) used.set(match[1]!, file);
+  }
+
+  it("finds the calls at all, so a silent zero cannot pass", () => {
+    expect(used.size).toBeGreaterThan(60);
+  });
+
+  it("has every statically named key", () => {
+    const missing = [...used].filter(([key]) => {
+      try {
+        at(EN, key);
+        return false;
+      } catch {
+        // A counted key is stored with plural suffixes, never bare.
+        try {
+          at(EN, `${key}_other`);
+          return false;
+        } catch {
+          return true;
+        }
+      }
+    });
+    expect(missing.map(([key, file]) => `${key} (${file})`)).toEqual([]);
+  });
+
+  /**
+   * The dynamic prefixes, listed so they are checked rather than trusted. Each
+   * is `t(`<prefix>.${value}`)` somewhere, and the values come from a union in
+   * the domain — a new match route or theme state must bring its text with it.
+   */
+  it("has every value behind a dynamic prefix", () => {
+    const groups: Record<string, string[]> = {
+      "theme.current": ["auto", "light", "dark"],
+      theme: ["auto", "light", "dark"],
+      via: ["model and classification", "model"],
+      "options.via": [
+        "classification and build date",
+        "classification",
+        "build date",
+        "the only record",
+      ],
+      "options.viaShort": [
+        "classification and build date",
+        "classification",
+        "build date",
+        "the only record",
+      ],
+      "parts.reason": ["date", "classification", "option"],
+      "settings.tab": ["data", "ui", "notes"],
+      "bin.column": [
+        "partNumber",
+        "pnc",
+        "name",
+        "quantity",
+        "catalogue",
+        "model",
+        "plate",
+        "vin",
+        "note",
+      ],
+      language: ["auto", "en", "pl"],
+    };
+    const missing: string[] = [];
+    for (const [prefix, values] of Object.entries(groups)) {
+      for (const value of values) {
+        for (const [lang, tree] of [
+          ["en", EN],
+          ["pl", PL],
+        ] as const) {
+          try {
+            at(tree, `${prefix}.${value}`);
+          } catch {
+            missing.push(`${lang}: ${prefix}.${value}`);
+          }
+        }
+      }
+    }
+    expect(missing).toEqual([]);
   });
 });
 

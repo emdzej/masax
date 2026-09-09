@@ -182,7 +182,8 @@
     "title": "Ustawienia",
     "tab": {
       "data": "Lokalizacja danych",
-      "ui": "Interfejs"
+      "ui": "Interfejs",
+      "notes": "Notatki"
     },
     "lede": "masax czyta katalog Mitsubishi ASA z Twojej własnej kopii. Zamontuj płyty i wskaż je programowi — nic nie jest wysyłane, wypakowywane ani konwertowane.",
     "discs": "Płyty i katalogi",
@@ -223,5 +224,62 @@
     "opening": "Otwieranie katalogu…",
     "readingParts": "Wczytywanie części…",
     "lookingUp": "Wyszukiwanie pojazdu…"
+  },
+  "bin": {
+    "title": "Koszyk części",
+    "openTitle": "Koszyk części",
+    "empty": "Koszyk jest pusty. Dodaj część z listy na tablicy.",
+    "add": "Dodaj {{value}} do koszyka",
+    "inBin": "w koszyku: {{count}}",
+    "lines_one": "{{count}} pozycja",
+    "lines_few": "{{count}} pozycje",
+    "lines_many": "{{count}} pozycji",
+    "lines_other": "{{count}} pozycji",
+    "pieces_one": "{{count}} sztuka",
+    "pieces_few": "{{count}} sztuki",
+    "pieces_many": "{{count}} sztuk",
+    "pieces_other": "{{count}} sztuk",
+    "quantity": "Ilość",
+    "remove": "Usuń {{value}} z koszyka",
+    "clear": "Opróżnij koszyk",
+    "print": "Drukuj",
+    "csv": "CSV",
+    "csvFile": "masax-koszyk-czesci.csv",
+    "from": "Z",
+    "printedFor": "Pojazd",
+    "column": {
+      "partNumber": "Numer części",
+      "pnc": "PNC",
+      "name": "Nazwa",
+      "quantity": "Ilość",
+      "catalogue": "Katalog",
+      "model": "Model",
+      "plate": "Tablica",
+      "vin": "VIN",
+      "note": "Notatka"
+    },
+    "footer": "Zebrane w masax z katalogu After Sales Application. Przed zamówieniem sprawdź każdy numer na tablicy."
+  },
+  "note": {
+    "title": "Notatka",
+    "add": "Dodaj notatkę do {{value}}",
+    "edit": "Notatka do {{value}}",
+    "placeholder": "np. M6 × 10 mm albo z której strony pasuje",
+    "save": "Zapisz",
+    "delete": "Usuń notatkę",
+    "count_one": "{{count}} notatka",
+    "count_few": "{{count}} notatki",
+    "count_many": "{{count}} notatek",
+    "count_other": "{{count}} notatek",
+    "none": "Brak notatek. Dodaj notatkę do części z listy na tablicy.",
+    "tab": "Notatki",
+    "lede": "Twoje własne uwagi do numeru części, widoczne wszędzie, gdzie ten numer się pojawia. Są zapisane tylko w tej przeglądarce, więc jeśli są ważne — wyeksportuj je.",
+    "export": "Eksport",
+    "import": "Import",
+    "file": "masax-notatki.json",
+    "clear": "Usuń wszystkie notatki",
+    "imported": "Dodano: {{added}}, zaktualizowano: {{updated}}, zachowano: {{kept}}.",
+    "importFailed": "Ten plik nie zawiera notatek, które masax potrafi odczytać.",
+    "limit": "pozostało znaków: {{count}}"
   }
 }

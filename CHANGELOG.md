@@ -8,6 +8,70 @@ as much as its evidence — the reasoning behind each one is in
 Versions follow [semantic versioning](https://semver.org/). Before 1.0 a minor
 bump is where features land.
 
+## 0.3.0
+
+### A parts bin
+
+A cart in the toolbar collects what you have decided to order. Adding from a
+plate's list takes the quantity the plate fits, and adding a number already in
+the bin raises that quantity rather than opening a second line — it is keyed by
+part number, and a bolt is a bolt however many plates list it.
+
+Each line carries where it came from: catalogue, model, plate and the VIN that
+was in the toolbar. That provenance is the difference between a list somebody
+else can act on and a column of numbers. The bin prints as a pick list,
+quantity first, and exports as CSV with every field quoted — part names contain
+commas as a matter of course.
+
+It is persisted, because a bin assembled across a dozen plates is the one piece
+of state in masax with real work in it.
+
+### Notes on a part number
+
+`MS240141` is `BOLT,FUEL FILLER PIPE` in the catalogue, which does not tell you
+it is M6×10. A note attaches that to the number and then follows it everywhere
+it appears — every plate that lists it, the bin, the printed pick list, the CSV.
+Shown inline rather than behind the icon: a note you have to hover to find is a
+note you have to already know about.
+
+Notes are keyed by part number and not scoped to a catalogue or model, and they
+export and import as JSON from a **Notes** tab in settings. Import merges,
+newest wins, so taking a colleague's notes does not discard your own. They are
+also the only thing in masax that cannot be re-read from the discs, which is why
+they are the only thing with an export.
+
+### Searchable catalogue and model
+
+Both are comboboxes now, filtering on the label, the key and the hint. The
+catalogue list needed it: **16 of the 52 catalogues share a name**, and the four
+`PAJERO/MONTERO(EUR)` entries are the Pajero 1 through 4. Each row therefore
+carries its production span, which is what actually separates them — and what a
+user is choosing between, since the model codes underneath differ completely
+between generations.
+
+### Fixed
+
+- `download()` wrote a UTF-8 BOM unconditionally. It is right for a CSV, and it
+  makes `JSON.parse` refuse the file — so the notes export could not be
+  imported back. Opt-in now, with the round trip under test.
+- The interface tab of settings showed `Forget` and `Open catalogue`, which act
+  on the data and mean nothing beside a theme picker. The footer follows the tab.
+- `settings.tab.notes` reached the interface as literal text. The suite now
+  walks every static `t("…")` call in the client and fails on a key that does
+  not exist, which is a better guarantee than a runtime fallback.
+- A dead `bin.lines`/`bin.pieces` pair and a dead `note.count` sat beside their
+  plural forms, where i18next v4 never reads them. The key-parity test caught
+  all three.
+
+### Repository
+
+- The parts-bin component is `PartsBin.svelte`, not `Bin.svelte`: a component
+  and a store differing only in case make `./bin.svelte` ambiguous on a
+  case-insensitive filesystem.
+- The toolbar controls carry names rather than positions. Inserting the cart
+  ahead of them turned `.tools button.icon:first` into a different button and
+  quietly opened a dialog over half the test suite.
+
 ## 0.2.0
 
 ### An OPC is a pack, and its options resolve

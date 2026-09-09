@@ -185,6 +185,48 @@ button {
   outline-offset: 1px;
 }
 
+/*
+ * Printing.
+ *
+ * There are two printable documents — the vehicle report and the parts bin —
+ * and only one of them may reach the paper. Each renders a `.masax-print`
+ * section that is absent on screen and hidden when printing; `#app` carries a
+ * `data-print` attribute naming the one to show.
+ *
+ * The hide rule is written as `#app > *:not(.masax-print)` rather than as a
+ * list of the interface's own class names, so renaming a panel cannot leave it
+ * printing. It also has to *exclude* the print sections rather than out-shout
+ * the rule: an id beats a class even with `!important` on both, so a
+ * `display: block` on the section would lose.
+ */
+.masax-print {
+  display: none;
+}
+
+@media print {
+  #app > *:not(.masax-print) {
+    display: none !important;
+  }
+  html,
+  body,
+  #app {
+    height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+    background: #fff !important;
+  }
+  /* Black on white regardless of the interface theme: paper has none. */
+  #app[data-print="report"] .masax-print-report,
+  #app[data-print="bin"] .masax-print-bin {
+    display: block !important;
+    color: #000;
+    background: #fff;
+    font:
+      11pt/1.4 system-ui,
+      sans-serif;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .pressable {
     transition:

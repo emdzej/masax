@@ -82,14 +82,11 @@
 </script>
 
 <!--
-  `masax-report` is an unscoped hook, and it has to be: the print rules reach
-  out of this component with `:global`, and a Svelte-scoped `.report` class
-  loses to `#app > *` on specificity even with `!important` — an id beats a
-  class, so the report stayed hidden while everything else was hidden too.
-  Excluding it from the hide rule is what fixes it, rather than trying to
-  out-shout that rule.
+  The two class hooks are unscoped on purpose: `theme.css` selects on them from
+  outside this component, and a Svelte-scoped class would not match. See the
+  note there for why the rules exclude rather than override.
 -->
-<section class="report masax-report" aria-hidden="true">
+<section class="report masax-print masax-print-report" aria-hidden="true">
   <header>
     <h1>{t("report.title")}</h1>
     <p class="meta">
@@ -147,39 +144,10 @@
 </section>
 
 <style>
-  /* Present in the DOM for printing, and never on screen. */
-  .report {
-    display: none;
-  }
-
+  /* The scaffolding — what is hidden, what shows, black on white — is shared
+     with the parts bin and lives in `theme.css`. Only this document's own
+     typography is here. */
   @media print {
-    /*
-     * Hide the interface, show the report. Every direct child of the mount
-     * point is hidden and the report is pulled out to full width — a selector
-     * on the interface's own class names would break the next time one is
-     * renamed.
-     */
-    :global(#app > *:not(.masax-report)) {
-      display: none !important;
-    }
-    :global(#app),
-    :global(html),
-    :global(body) {
-      height: auto !important;
-      overflow: visible !important;
-      display: block !important;
-      background: #fff !important;
-    }
-
-    :global(.masax-report) {
-      display: block !important;
-      /* Black on white: paper has no theme. */
-      color: #000;
-      background: #fff;
-      font:
-        11pt/1.4 system-ui,
-        sans-serif;
-    }
     .report .code {
       font-family: ui-monospace, Menlo, Consolas, monospace;
     }
