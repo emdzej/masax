@@ -1,0 +1,213 @@
+{
+  "language": {
+    "auto": "Match the browser",
+    "en": "English",
+    "pl": "Polski"
+  },
+  "theme": {
+    "label": "Theme",
+    "auto": "Match the system",
+    "light": "Light",
+    "dark": "Dark",
+    "current": {
+      "auto": "Theme: following the system",
+      "light": "Theme: light",
+      "dark": "Theme: dark"
+    },
+    "change": "Click to change."
+  },
+  "toolbar": {
+    "about": "About masax",
+    "release": "Release notes for {{version}}",
+    "repo": "masax on GitHub",
+    "vehicle": "Vehicle",
+    "vin": "Chassis + serial",
+    "decode": "Decode",
+    "catalogue": "Catalogue",
+    "model": "Model",
+    "choose": "Choose…",
+    "none": "—",
+    "settings": "Data location and settings"
+  },
+  "strip": {
+    "model": "Model",
+    "class": "Class",
+    "built": "Built",
+    "opc": "OPC",
+    "paint": "Paint",
+    "trim": "Trim",
+    "opcTitle": "What {{opc}} includes",
+    "report": "Report",
+    "reportTitle": "Print a report for this vehicle",
+    "opened": "opened {{catalogue}} from {{via}}",
+    "noCatalogue": "no catalogue listed for this model",
+    "specFrom": "spec from serial",
+    "openedMore_one": "over {{count}} other",
+    "openedMore_other": "over {{count}} others"
+  },
+  "via": {
+    "model and classification": "model and classification",
+    "model": "model"
+  },
+  "rail": {
+    "group": "Group",
+    "plate": "Plate",
+    "filterGroups": "Filter groups",
+    "filterPlates": "Filter plates",
+    "clear": "Clear filter",
+    "noMatch": "No match for “{{query}}”.",
+    "chooseCatalogue": "Choose a catalogue and model.",
+    "chooseGroup": "Choose a group."
+  },
+  "drawing": {
+    "choosePlate": "Choose a plate.",
+    "notInData": "{{name}}: {{problem}}",
+    "noPlate": "No plate selected",
+    "drawingOf": "Drawing {{name}}",
+    "calloutSelect": "{{label}} — select this part",
+    "calloutInert": "{{label}} — not on this list",
+    "callout": "Callout {{label}}",
+    "copy": "Copy the plate as an image",
+    "copyRefused": "The browser refused the clipboard",
+    "fit": "Fit to the column",
+    "actual": "Show at actual size, and drag to pan",
+    "plate": "Plate",
+    "group": "Group",
+    "name": "Drawing",
+    "decoding": "decoding…",
+    "callouts_one": "{{count}} callout",
+    "callouts_other": "{{count}} callouts"
+  },
+  "parts": {
+    "title": "Parts",
+    "thisVehicle": "This vehicle",
+    "thisVehicleTitle": "Narrow to the decoded vehicle: build date, classification and option pack",
+    "rowsOf": "{{shown}} of {{total}} rows",
+    "pnc": "PNC",
+    "partNumber": "Part number",
+    "qty": "Qty",
+    "name": "Name",
+    "period": "Period",
+    "applies": "Applies",
+    "choosePlate": "Choose a plate to see its parts.",
+    "noParts": "No parts on this plate.",
+    "noneFit": "None of this plate's {{count}} rows fit this vehicle. Untick “{{label}}” to see them.",
+    "hint": "Click a row or a callout on the plate to link the two. The list is this plate's drawing.",
+    "reason": {
+      "date": "outside this vehicle's build date",
+      "classification": "another classification",
+      "option": "an option this vehicle does not have"
+    },
+    "copyNumber": "Copy part number {{value}}",
+    "copyName": "Copy part name {{value}}",
+    "copyValue": "Copy {{value}}",
+    "clsCount": "{{count}} cls",
+    "codeCount": "{{count}} cd",
+    "rows_one": "{{count}} row",
+    "rows_other": "{{count}} rows",
+    "codes_one": "{{count}} code",
+    "codes_other": "{{count}} codes",
+    "hidden_one": "{{count}} row hidden: {{reasons}}.",
+    "hidden_other": "{{count}} rows hidden: {{reasons}}."
+  },
+  "options": {
+    "title": "Options",
+    "reading": "Reading the option pack…",
+    "none": "No option pack in this data for that OPC. 1,016 model-and-OPC pairs are not described by the catalogue.",
+    "undescribed": "not described in this catalogue",
+    "noDescription": "{{count}} of these carry no description. 171 of the codes the catalogue uses have no entry in its own option table.",
+    "via": {
+      "classification and build date": "matched on {{classification}} and the build date",
+      "classification": "matched on {{classification}} only — no period covers this build date",
+      "build date": "matched on the build date only — no record lists this classification",
+      "the only record": "the one record for this pack; neither classification nor date matched it"
+    },
+    "classification": "classification",
+    "otherRecords_one": "{{count}} other record for this pack",
+    "otherRecords_other": "{{count}} other records for this pack",
+    "viaShort": {
+      "classification and build date": "classification and build date",
+      "classification": "classification only",
+      "build date": "build date only",
+      "the only record": "the only record"
+    }
+  },
+  "report": {
+    "title": "Vehicle report",
+    "meta": "read from the After Sales Application catalogue",
+    "vehicle": "Vehicle",
+    "catalogue": "Catalogue",
+    "options": "Options — {{opc}}",
+    "optionsMeta": "{{count}} codes, matched on {{via}}",
+    "optionsNone": "This catalogue does not describe the contents of that option pack.",
+    "footer": "Generated by masax from the catalogue's own data — not a Mitsubishi document. Dates are the year, month and third of month, as the catalogue records them.",
+    "field": {
+      "vin": "VIN",
+      "chassis": "Chassis",
+      "serial": "Serial",
+      "model": "Model",
+      "classification": "Classification",
+      "built": "Built",
+      "modelYear": "Model year code",
+      "opc": "OPC",
+      "paint": "Paint",
+      "trim": "Trim",
+      "exterior": "Exterior",
+      "sef": "SEF",
+      "bcc": "BCC",
+      "bcf": "BCF",
+      "cfc": "CFC",
+      "specFrom": "Specification read from",
+      "specFromValue": "serial {{serial}}",
+      "half": "Vehicle index half",
+      "catalogueName": "Catalogue",
+      "catalogueId": "Catalogue id",
+      "vnc": "Vehicle name code",
+      "matchedOn": "Matched on"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "tab": {
+      "data": "Data location",
+      "ui": "User interface"
+    },
+    "lede": "masax reads a Mitsubishi ASA catalogue from your own copy. Mount the discs and point it at them — nothing is uploaded, extracted or converted.",
+    "discs": "Discs and folders",
+    "reopen": "Reopen {{names}}",
+    "choose": "Choose a disc or folder",
+    "hosted": "Hosted tree",
+    "open": "Open",
+    "hostedNote": "A hosted tree carries a {{manifest}}, because HTTP cannot list a directory. {{command}} writes one.",
+    "catalogueLanguage": "Catalogue text",
+    "catalogueLanguageNote": "The language the catalogue's own text is read in. Coverage is partial: German translates about a quarter of the strings and French a third, the rest stay English.",
+    "interfaceLanguage": "Interface language",
+    "forget": "Forget",
+    "openCatalogue": "Open catalogue",
+    "close": "Close",
+    "closeSettings": "Close settings",
+    "addAnother": "Add another disc",
+    "removeDisc": "Remove {{name}}",
+    "partial": "One disc is part of the catalogue: disc A carries 30 of the 52 catalogues and one half of the vehicle index, disc B the rest. Add the second for a complete set, or carry on with this one.",
+    "conflicts_one": "{{count}} file differs between these discs, so one would be shadowed. First:",
+    "conflicts_other": "{{count}} files differ between these discs, so one would be shadowed. First:",
+    "noFolderApi": "This browser cannot open a local folder — the File System Access API is Chromium-only. Chrome and Edge can; Firefox and Safari cannot. Use a hosted tree instead.",
+    "urlPlaceholder": "https://example.org/asa/M60/",
+    "done": "Done",
+    "appliesAtOnce": "Language and theme apply as you pick them."
+  },
+  "about": {
+    "title": "About",
+    "body1": "A parts catalogue for Mitsubishi vehicles, read from your own copy of the After Sales Application discs. It runs entirely in the browser: the data is read where it lies, and nothing is uploaded.",
+    "body2": "The catalogue format, the CCITT Group 4 drawings and the callout hotspots were worked out by reading the data, and the findings are documented in the repository alongside the code that reads them.",
+    "fine": "Not affiliated with or endorsed by Mitsubishi. The catalogue data is Mitsubishi's and is not distributed with this software — you supply your own discs. masax is interoperability work: understanding a 2008 format so the information can be read on current systems.",
+    "source": "Source and documentation",
+    "licence": "PolyForm Noncommercial 1.0.0"
+  },
+  "app": {
+    "tagline": "Mitsubishi parts catalogue",
+    "opening": "Opening the catalogue…",
+    "readingParts": "Reading the parts…",
+    "lookingUp": "Looking up the vehicle…"
+  }
+}

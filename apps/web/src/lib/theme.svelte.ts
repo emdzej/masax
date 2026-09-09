@@ -15,7 +15,9 @@
 export type ThemeChoice = "auto" | "light" | "dark";
 
 const KEY = "masax.theme.v1";
-const CHOICES: ThemeChoice[] = ["auto", "light", "dark"];
+/** The three states, in the order the cycle and the settings list use. */
+export const THEME_CHOICES: readonly ThemeChoice[] = ["auto", "light", "dark"];
+const CHOICES = THEME_CHOICES;
 
 const isChoice = (value: unknown): value is ThemeChoice =>
   typeof value === "string" && (CHOICES as string[]).includes(value);
@@ -96,9 +98,8 @@ class Theme {
 
 export const theme = new Theme();
 
-/** What the button says it will do next, and what it is showing now. */
-export const THEME_LABEL: Record<ThemeChoice, string> = {
-  auto: "Theme: following the system",
-  light: "Theme: light",
-  dark: "Theme: dark",
-};
+/*
+ * The label for the current state used to live here as a record of English
+ * strings. It is a translation key now — `theme.current.<choice>` — so the
+ * three states name themselves in whatever language the interface is in.
+ */

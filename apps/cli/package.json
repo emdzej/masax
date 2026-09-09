@@ -1,6 +1,6 @@
 {
   "name": "@masax/cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "ASA disc tooling: validate the formats, inspect datasets, decode VINs and drawings",
   "license": "PolyForm-Noncommercial-1.0.0",

@@ -27,6 +27,7 @@
   import { fitsVehicle, type FitFailure, type GroupRef, type PartRow, type VehicleFit } from "@masax/catalogue";
   import { formatAsaDateShort } from "@masax/core";
   import { copyText } from "./clipboard";
+  import { i18n } from "./i18n/index.svelte";
 
   let {
     parts,
@@ -70,11 +71,10 @@
     };
   });
 
-  const REASON: Record<FitFailure, string> = {
-    date: "outside this vehicle's build date",
-    classification: "another classification",
-    option: "an option this vehicle does not have",
-  };
+  /** The failure names double as translation keys; see `applicability.ts`. */
+  const reasonText = $derived((reason: FitFailure) => t(`parts.reason.${reason}`));
+
+  const t = $derived(i18n.t);
 
   let body = $state<HTMLTableSectionElement | undefined>(undefined);
 
@@ -123,12 +123,12 @@
 
 <section class="panel">
   <header>
-    <span class="label">Parts</span>
+    <span class="label">{t("parts.title")}</span>
     <div class="spacer"></div>
     {#if canNarrow}
-      <label class="switch" title="Narrow to the decoded vehicle: build date, classification and option pack">
+      <label class="switch" title={t("parts.thisVehicleTitle")}>
         <input type="checkbox" bind:checked={narrowed} />
-        <span>This vehicle</span>
+        <span>{t("parts.thisVehicle")}</span>
       </label>
     {/if}
     {#if shown.length > 0}
@@ -141,11 +141,11 @@
       -->
       <span class="count code">
         {#if hidden.count > 0}
-          {shown.length} of {parts.length} rows
+          {t("parts.rowsOf", { shown: shown.length, total: parts.length })}
         {:else}
-          {shown.length} {shown.length === 1 ? "row" : "rows"}
+          {t("parts.rows", { count: shown.length })}
         {/if}
-        · {codes} {codes === 1 ? "code" : "codes"}
+        · {t("parts.codes", { count: codes })}
       </span>
     {/if}
   </header>
@@ -153,12 +153,11 @@
   {#if shown.length === 0}
     <p class="none">
       {#if !plate}
-        Choose a plate to see its parts.
+        {t("parts.choosePlate")}
       {:else if parts.length > 0}
-        None of this plate's {parts.length} rows fit this vehicle. Untick “This vehicle” to
-        see them.
+        {t("parts.noneFit", { count: parts.length, label: t("parts.thisVehicle") })}
       {:else}
-        No parts on this plate.
+        {t("parts.noParts")}
       {/if}
     </p>
   {:else}
@@ -166,12 +165,12 @@
       <table>
         <thead>
           <tr>
-            <th class="label">PNC</th>
-            <th class="label">Part number</th>
-            <th class="label num">Qty</th>
-            <th class="label">Name</th>
-            <th class="label">Period</th>
-            <th class="label">Applies</th>
+            <th class="label">{t("parts.pnc")}</th>
+            <th class="label">{t("parts.partNumber")}</th>
+            <th class="label num">{t("parts.qty")}</th>
+            <th class="label">{t("parts.name")}</th>
+            <th class="label">{t("parts.period")}</th>
+            <th class="label">{t("parts.applies")}</th>
           </tr>
         </thead>
         <tbody bind:this={body}>
@@ -196,8 +195,8 @@
                     class="copy"
                     class:done={copied === key}
                     onclick={(e) => void copy(key, part.partNumber!, e)}
-                    title="Copy {part.partNumber}"
-                    aria-label="Copy part number {part.partNumber}"
+                    title={t("parts.copyValue", { value: part.partNumber })}
+                    aria-label={t("parts.copyNumber", { value: part.partNumber })}
                   >
                     {#if copied === key}<Check size={11} />{:else}<Copy size={11} />{/if}
                   </button>
@@ -212,8 +211,8 @@
                     class="copy"
                     class:done={copied === key}
                     onclick={(e) => void copy(key, part.name!, e)}
-                    title="Copy “{part.name}”"
-                    aria-label="Copy part name {part.name}"
+                    title={t("parts.copyValue", { value: part.name })}
+                    aria-label={t("parts.copyName", { value: part.name })}
                   >
                     {#if copied === key}<Check size={11} />{:else}<Copy size={11} />{/if}
                   </button>
@@ -227,12 +226,12 @@
                   <span class="tag code" title={part.classification.join(", ")}>
                     {part.classification.length === 1
                       ? part.classification[0]
-                      : `${part.classification.length} cls`}
+                      : t("parts.clsCount", { count: part.classification.length })}
                   </span>
                 {/if}
                 {#if part.applicableCodes?.length}
                   <span class="tag code" title={part.applicableCodes.join(", ")}>
-                    {part.applicableCodes.length} cd
+                    {t("parts.codeCount", { count: part.applicableCodes.length })}
                   </span>
                 {/if}
                 {#if part.supplyCondition}
@@ -248,11 +247,12 @@
       <Info size={12} />
       <span>
         {#if hidden.count > 0}
-          {hidden.count} row{hidden.count === 1 ? "" : "s"} hidden:
-          {hidden.reasons.map((r) => REASON[r]).join(", ")}.
+          {t("parts.hidden", {
+            count: hidden.count,
+            reasons: hidden.reasons.map(reasonText).join(", "),
+          })}
         {:else}
-          Click a row or a callout on the plate to link the two. The list is this plate's
-          drawing.
+          {t("parts.hint")}
         {/if}
       </span>
     </footer>
@@ -422,7 +422,14 @@
   }
   th {
     text-align: left;
-    padding: 0.3rem 0.5rem;
+    /*
+     * Tighter than it looks like it wants to be, and deliberately: six columns
+     * of nowrap headers plus a date range in mono is a wide minimum, and Polish
+     * headers are longer than English ones. At 0.5rem the table overflowed its
+     * pane in Polish at a 1500px window — the pane scrolls, so nothing is lost,
+     * but a clipped column header reads as broken.
+     */
+    padding: 0.3rem 0.38rem;
     border-bottom: 1px solid var(--rule);
     white-space: nowrap;
     background: var(--sheet);
@@ -430,7 +437,8 @@
     top: 0;
   }
   td {
-    padding: 0.28rem 0.5rem;
+    /* Matches the header's horizontal rhythm; see the note there. */
+    padding: 0.28rem 0.38rem;
     border-bottom: 1px solid var(--rule-soft);
     vertical-align: top;
   }

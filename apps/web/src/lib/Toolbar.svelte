@@ -17,7 +17,8 @@
   import Diamond from "./Diamond.svelte";
   import GithubMark from "./GithubMark.svelte";
   import { REPOSITORY, VERSION, releaseUrl } from "./build";
-  import { THEME_LABEL, theme } from "./theme.svelte";
+  import { theme } from "./theme.svelte";
+  import { i18n, segments, slot } from "./i18n/index.svelte";
   import { formatAsaDate } from "@masax/core";
   import type { CatalogueInfo, VehicleCatalogue, VinRecord } from "@masax/catalogue";
 
@@ -58,11 +59,34 @@
     onOptions: () => void;
     onReport: () => void;
   } = $props();
+
+  const t = $derived(i18n.t);
+  /** Names the state the control is in, not the one it will move to. */
+  const themeLabel = $derived(t(`theme.current.${theme.choice}`));
+
+  /**
+   * "opened PAJERO/MONTERO(EUR) from model and classification", with the
+   * catalogue name in mono.
+   *
+   * Built through `segments` because Polish moves the styled fragment:
+   * `otwarto X na podstawie: modelu`. Splitting the sentence into three
+   * translated pieces would fix the English word order into every language.
+   */
+  const openedParts = $derived(
+    resolved
+      ? segments(
+          t("strip.opened", {
+            catalogue: slot("catalogue"),
+            via: t(`via.${resolved.via}`),
+          }),
+        )
+      : [],
+  );
 </script>
 
 <header class="bar">
   <div class="brand">
-    <button class="wordmark" onclick={onAbout} title="About masax">
+    <button class="wordmark" onclick={onAbout} title={t("toolbar.about")}>
       <Diamond size={12} />
       <span>masa<span class="x">x</span></span>
     </button>
@@ -71,7 +95,7 @@
       href={releaseUrl()}
       target="_blank"
       rel="noreferrer noopener"
-      title={`Release notes for ${VERSION}`}
+      title={t("toolbar.release", { version: VERSION })}
     >
       {VERSION}
     </a>
@@ -80,15 +104,15 @@
       href={REPOSITORY}
       target="_blank"
       rel="noreferrer noopener"
-      aria-label="masax on GitHub"
-      title="masax on GitHub"
+      aria-label={t("toolbar.repo")}
+      title={t("toolbar.repo")}
     >
       <GithubMark size={14} />
     </a>
   </div>
 
   <div class="group">
-    <label class="label" for="vin">Vehicle</label>
+    <label class="label" for="vin">{t("toolbar.vehicle")}</label>
     <div class="vin">
       <input
         id="vin"
@@ -96,22 +120,22 @@
         value={vin}
         oninput={(e) => onVin(e.currentTarget.value)}
         onkeydown={(e) => e.key === "Enter" && onDecode()}
-        placeholder="Chassis + serial"
+        placeholder={t("toolbar.vin")}
         spellcheck="false"
         autocomplete="off"
       />
-      <button onclick={onDecode} disabled={busy || !vin}>Decode</button>
+      <button onclick={onDecode} disabled={busy || !vin}>{t("toolbar.decode")}</button>
     </div>
   </div>
 
   <div class="group grow">
-    <label class="label" for="catalogue">Catalogue</label>
+    <label class="label" for="catalogue">{t("toolbar.catalogue")}</label>
     <select
       id="catalogue"
       value={selectedCatalogue ?? ""}
       onchange={(e) => onCatalogue(e.currentTarget.value)}
     >
-      <option value="" disabled>Choose…</option>
+      <option value="" disabled>{t("toolbar.choose")}</option>
       {#each catalogues as info (info.id)}
         <option value={info.id}>{info.name ?? info.id}</option>
       {/each}
@@ -119,7 +143,7 @@
   </div>
 
   <div class="group">
-    <label class="label" for="model">Model</label>
+    <label class="label" for="model">{t("toolbar.model")}</label>
     <select
       id="model"
       class="code"
@@ -127,7 +151,9 @@
       onchange={(e) => onModel(e.currentTarget.value)}
       disabled={models.length === 0}
     >
-      <option value="" disabled>{models.length === 0 ? "—" : "Choose…"}</option>
+      <option value="" disabled>
+        {models.length === 0 ? t("toolbar.none") : t("toolbar.choose")}
+      </option>
       {#each models as model (model)}
         <option value={model}>{model}</option>
       {/each}
@@ -141,7 +167,7 @@
     reach for by muscle memory, so it keeps the corner.
   -->
   <div class="tools">
-    <button class="icon" onclick={() => theme.cycle()} title={THEME_LABEL[theme.choice]}>
+    <button class="icon" onclick={() => theme.cycle()} title={themeLabel}>
       <!--
         The icon shows the *current* state rather than the next one. A monitor
         for auto, because auto is "whatever that screen says"; and the label
@@ -150,9 +176,9 @@
       {#if theme.choice === "auto"}<Monitor size={15} />
       {:else if theme.choice === "light"}<Sun size={15} />
       {:else}<Moon size={15} />{/if}
-      <span class="sr">{THEME_LABEL[theme.choice]}. Click to change.</span>
+      <span class="sr">{themeLabel}. {t("theme.change")}</span>
     </button>
-    <button class="icon" onclick={onSettings} aria-label="Data location and settings">
+    <button class="icon" onclick={onSettings} aria-label={t("toolbar.settings")}>
       <Cog size={15} />
     </button>
   </div>
@@ -165,13 +191,13 @@
       <span>{vinError}</span>
     {:else if vehicle}
       <dl>
-        <dt class="label">Model</dt>
+        <dt class="label">{t("strip.model")}</dt>
         <dd class="code strong">{vehicle.model ?? "—"}</dd>
-        <dt class="label">Class</dt>
+        <dt class="label">{t("strip.class")}</dt>
         <dd class="code">{vehicle.classification ?? "—"}</dd>
-        <dt class="label">Built</dt>
+        <dt class="label">{t("strip.built")}</dt>
         <dd class="code">{formatAsaDate(vehicle.productionDate) || "—"}</dd>
-        <dt class="label">OPC</dt>
+        <dt class="label">{t("strip.opc")}</dt>
         <dd class="code">
           <!--
             The OPC is a key, not a reading: `H70` stands for 34 options. So the
@@ -180,16 +206,20 @@
             it leads somewhere.
           -->
           {#if vehicle.opc}
-            <button class="opc code" onclick={onOptions} title="What {vehicle.opc} includes">
+            <button
+              class="opc code"
+              onclick={onOptions}
+              title={t("strip.opcTitle", { opc: vehicle.opc })}
+            >
               {vehicle.opc}
             </button>
           {:else}
             —
           {/if}
         </dd>
-        <dt class="label">Paint</dt>
+        <dt class="label">{t("strip.paint")}</dt>
         <dd class="code">{vehicle.paint ?? "—"}</dd>
-        <dt class="label">Trim</dt>
+        <dt class="label">{t("strip.trim")}</dt>
         <dd class="code">{vehicle.interior ?? "—"}</dd>
       </dl>
       <!--
@@ -197,20 +227,24 @@
         the strip: the vehicle, not the catalogue or the plate. It sits after
         the values so it reads as an action on them.
       -->
-      <button class="report" onclick={onReport} title="Print a report for this vehicle">
+      <button class="report" onclick={onReport} title={t("strip.reportTitle")}>
         <Printer size={13} />
-        <span>Report</span>
+        <span>{t("strip.report")}</span>
       </button>
       <span class="via">
         {#if resolved}
-          opened <span class="code">{resolved.name ?? resolved.catalogue}</span> from
-          {resolved.via}{#if resolved.alternatives.length}, over {resolved.alternatives
-              .length} other{resolved.alternatives.length === 1 ? "" : "s"}{/if}
+          {#each openedParts as part, i (i)}
+            {#if "slot" in part}
+              <span class="code">{resolved.name ?? resolved.catalogue}</span>
+            {:else}{part.text}{/if}
+          {/each}{#if resolved.alternatives.length}, {t("strip.openedMore", {
+              count: resolved.alternatives.length,
+            })}{/if}
         {:else}
-          no catalogue listed for this model
+          {t("strip.noCatalogue")}
         {/if}
         {#if vehicle.specFrom}
-          · spec from serial <span class="code">{vehicle.specFrom}</span>
+          · {t("strip.specFrom")} <span class="code">{vehicle.specFrom}</span>
         {/if}
       </span>
     {/if}

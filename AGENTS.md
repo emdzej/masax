@@ -148,6 +148,29 @@ the Pajero I catalogue and simply not the one for that model. **Before
 concluding two code sets are unrelated, check a pair the data says belongs
 together.**
 
+## Two languages, and they are not the same one
+
+The catalogue carries its own text in four languages through `Desc`; the
+interface speaks English or Polish through `apps/web/src/lib/i18n`. They are
+independent, and conflating them is the obvious mistake: `DESC_D` translates a
+quarter of the catalogue's strings, so a Polish interface over an English parts
+list is the normal case.
+
+**Adding a counted string means adding Polish plural forms.** i18next keys
+plurals off `Intl.PluralRules`, so English needs `_one`/`_other` and Polish
+needs `_one`/`_few`/`_many`/`_other`. `i18n.test.ts` asserts that from the
+language's own categories rather than from a hardcoded list, so a missing
+`_many` fails the suite instead of rendering `5 wiersze` to a Polish reader.
+
+Two smaller traps it also covers: a key present in one file and missing in the
+other falls back silently, and a sentence that needs markup inside it must stay
+whole in the JSON — use `slot()` and `segments()`, because Polish moves the
+styled fragment.
+
+And **Polish is longer than English.** Six nowrap column headers overflowed the
+parts pane by 17px at a 1500px window; the fix was the shared cell padding, not
+a shorter Polish word. Check a dense layout in both.
+
 ## A field's label is not its vocabulary
 
 `catalog.E1` is labelled **OPC** in the `.ddm`, and it is not a pack code. A

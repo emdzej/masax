@@ -43,6 +43,7 @@
   } from "@masax/illust";
   import { formatAsaDateShort } from "@masax/core";
   import { theme } from "./theme.svelte";
+  import { i18n } from "./i18n/index.svelte";
   import { canvasToPng, copyImage } from "./clipboard";
   import type { AsaCatalogue, GroupRef } from "@masax/catalogue";
 
@@ -63,6 +64,8 @@
     activePnc?: string;
     onPick?: (pnc: string) => void;
   } = $props();
+
+  const t = $derived(i18n.t);
 
   const PADDING = 8;
 
@@ -292,9 +295,9 @@
     onclickcapture={swallowClickAfterPan}
   >
     {#if !name}
-      <p class="none">Choose a plate.</p>
+      <p class="none">{t("drawing.choosePlate")}</p>
     {:else if problem}
-      <p class="none"><ImageOff size={16} /> {name}: {problem}</p>
+      <p class="none"><ImageOff size={16} /> {t("drawing.notInData", { name, problem })}</p>
     {/if}
 
     <div
@@ -302,7 +305,7 @@
       class:hidden={!name || Boolean(problem)}
       style="width:{stage.width}px;height:{stage.height}px"
     >
-      <canvas bind:this={canvas} aria-label={name ? `Drawing ${name}` : "No plate selected"}
+      <canvas bind:this={canvas} aria-label={name ? t("drawing.drawingOf", { name }) : t("drawing.noPlate")}
       ></canvas>
       {#each hotspots as spot, i (`${spot.pnc}-${spot.x}-${spot.y}-${i}`)}
         {@const live = pickable(spot)}
@@ -311,8 +314,10 @@
           class:live
           class:on={live && spot.pnc === activePnc}
           disabled={!live}
-          title={live ? `${spot.label} — select this part` : `${spot.label} — not on this list`}
-          aria-label={`Callout ${spot.label}`}
+          title={live
+            ? t("drawing.calloutSelect", { label: spot.label })
+            : t("drawing.calloutInert", { label: spot.label })}
+          aria-label={t("drawing.callout", { label: spot.label })}
           onclick={() => live && onPick?.(spot.pnc)}
           style="left:{spot.x * scale}px;top:{spot.y * scale}px;width:{spot.width *
             scale}px;height:{spot.height * scale}px"
@@ -332,16 +337,16 @@
       class:ok={copied === "ok"}
       class:no={copied === "no"}
       onclick={() => void copyDrawing()}
-      title={copied === "no" ? "The browser refused the clipboard" : "Copy the plate as an image"}
-      aria-label="Copy the plate as an image"
+      title={copied === "no" ? t("drawing.copyRefused") : t("drawing.copy")}
+      aria-label={t("drawing.copy")}
     >
       {#if copied === "ok"}<Check size={13} />{:else}<Copy size={13} />{/if}
     </button>
     <button
       class="zoom"
       onclick={toggleActual}
-      title={actual ? "Fit to the column" : "Show at actual size, and drag to pan"}
-      aria-label={actual ? "Fit to the column" : "Show at actual size"}
+      title={actual ? t("drawing.fit") : t("drawing.actual")}
+      aria-label={actual ? t("drawing.fit") : t("drawing.actual")}
     >
       {#if actual}<Minimize2 size={13} />{:else}<Maximize2 size={13} />{/if}
     </button>
@@ -350,12 +355,12 @@
   {#if plate}
     <figcaption class="block">
       <div class="cell name">
-        <span class="label">Plate</span>
+        <span class="label">{t("drawing.plate")}</span>
         <span class="value">{plate.name ?? "—"}</span>
         {#if plate.note}<span class="sub">{plate.note}</span>{/if}
       </div>
       <div class="cell">
-        <span class="label">Group</span>
+        <span class="label">{t("drawing.group")}</span>
         <span class="value code nowrap">
           {plate.mainGroup}-{String(plate.subGroup ?? 0).padStart(3, "0")}
           <span class="dim">/ {model ?? "—"}</span>
@@ -363,14 +368,14 @@
         {#if window_}<span class="sub code">{window_}</span>{/if}
       </div>
       <div class="cell">
-        <span class="label">Drawing</span>
+        <span class="label">{t("drawing.name")}</span>
         <span class="value code nowrap">{name ?? "—"}</span>
         <span class="sub code">
           {#if loading}
-            decoding…
+            {t("drawing.decoding")}
           {:else if natural.width}
             {natural.width}×{natural.height}{hotspots.length
-              ? ` · ${hotspots.length} callouts`
+              ? ` · ${t("drawing.callouts", { count: hotspots.length })}`
               : ""}
           {/if}
         </span>

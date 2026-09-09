@@ -17,12 +17,15 @@
   import Diamond from "./Diamond.svelte";
   import { formatAsaDateShort } from "@masax/core";
   import type { OptionSet } from "@masax/catalogue";
+  import { i18n } from "./i18n/index.svelte";
 
   let {
     set,
     busy,
     onClose,
   }: { set?: OptionSet; busy: boolean; onClose: () => void } = $props();
+
+  const t = $derived(i18n.t);
 
   const window_ = $derived.by(() => {
     if (!set) return "";
@@ -31,20 +34,19 @@
     return from || to ? `${from || "?"} – ${to || "?"}` : "";
   });
 
-  /** Said plainly, because a fallback match can be the wrong period's list. */
-  const provenance = $derived.by(() => {
-    if (!set) return "";
-    switch (set.via) {
-      case "classification and build date":
-        return `matched on ${set.classification ?? "classification"} and the build date`;
-      case "classification":
-        return `matched on ${set.classification ?? "classification"} only — no period covers this build date`;
-      case "build date":
-        return "matched on the build date only — no record lists this classification";
-      case "the only record":
-        return "the one record for this pack; neither classification nor date matched it";
-    }
-  });
+  /**
+   * Said plainly, because a fallback match can be the wrong period's list.
+   *
+   * The `via` values are the domain's own words and double as translation keys,
+   * so a new match route surfaces as a missing key rather than as silence.
+   */
+  const provenance = $derived(
+    set
+      ? t(`options.via.${set.via}`, {
+          classification: set.classification ?? t("options.classification"),
+        })
+      : "",
+  );
 
   const described = $derived(set?.options.filter((o) => o.name).length ?? 0);
 </script>
@@ -53,10 +55,10 @@
 
 <div class="scrim" role="presentation">
   <button class="backdrop" onclick={onClose} aria-label="Close" tabindex="-1"></button>
-  <div class="panel" role="dialog" aria-modal="true" aria-label="Options" tabindex="-1">
+  <div class="panel" role="dialog" aria-modal="true" aria-label={t("options.title")} tabindex="-1">
     <header>
       <Diamond size={11} />
-      <h2>Options</h2>
+      <h2>{t("options.title")}</h2>
       {#if set}
         <span class="pack code">{set.model} · {set.opc}</span>
       {/if}
@@ -64,24 +66,19 @@
       <span class="count code">
         {#if set}{set.options.length}{/if}
       </span>
-      <button class="icon" onclick={onClose} aria-label="Close"><X size={15} /></button>
+      <button class="icon" onclick={onClose} aria-label={t("settings.close")}><X size={15} /></button>
     </header>
 
     {#if busy}
-      <p class="none">Reading the option pack…</p>
+      <p class="none">{t("options.reading")}</p>
     {:else if !set}
-      <p class="none">
-        No option pack in this data for that OPC. 1,016 model-and-OPC pairs are not
-        described by the catalogue.
-      </p>
+      <p class="none">{t("options.none")}</p>
     {:else}
       <div class="meta">
         <span>{provenance}</span>
         {#if window_}<span class="code">{window_}</span>{/if}
         {#if set.others > 0}
-          <span class="fine">
-            {set.others} other record{set.others === 1 ? "" : "s"} for this pack
-          </span>
+          <span class="fine">{t("options.otherRecords", { count: set.others })}</span>
         {/if}
       </div>
 
@@ -90,7 +87,7 @@
           <li>
             <span class="oc code">{option.code}</span>
             <span class="name" class:bare={!option.name}>
-              {option.name ?? "not described in this catalogue"}
+              {option.name ?? t("options.undescribed")}
             </span>
           </li>
         {/each}
@@ -98,8 +95,7 @@
 
       {#if described < set.options.length}
         <footer class="fine">
-          {set.options.length - described} of these carry no description. 171 of the codes
-          the catalogue uses have no entry in its own option table.
+          {t("options.noDescription", { count: set.options.length - described })}
         </footer>
       {/if}
     {/if}

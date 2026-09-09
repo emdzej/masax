@@ -19,9 +19,12 @@
   import Toolbar from "./lib/Toolbar.svelte";
   import { AppState } from "./lib/state.svelte";
   import { tick } from "svelte";
+  import { i18n } from "./lib/i18n/index.svelte";
   import "./lib/theme.css";
 
   const app = new AppState();
+  const t = $derived(i18n.t);
+
   let aboutOpen = $state(false);
 
   /**
@@ -118,17 +121,17 @@
   <div class="work">
     <aside>
       <SearchList
-        label="Group"
+        label={t("rail.group")}
         items={groupItems}
         selectedKey={app.selectedMainGroup === undefined
           ? undefined
           : String(app.selectedMainGroup)}
         onSelect={(item) => app.selectMainGroup(Number(item.code))}
-        placeholder="Filter groups"
-        emptyHint="Choose a catalogue and model."
+        placeholder={t("rail.filterGroups")}
+        emptyHint={t("rail.chooseCatalogue")}
       />
       <SearchList
-        label="Plate"
+        label={t("rail.plate")}
         items={plateItems}
         selectedKey={selectedPlateKey}
         onSelect={(item) => {
@@ -136,8 +139,8 @@
           const plate = app.plates[at];
           if (plate) void app.selectPlate(plate);
         }}
-        placeholder="Filter plates"
-        emptyHint="Choose a group."
+        placeholder={t("rail.filterPlates")}
+        emptyHint={t("rail.chooseGroup")}
       />
     </aside>
 
@@ -170,7 +173,7 @@
 {:else}
   <div class="boot">
     <div class="mark"><Diamond size={16} /> <span>masa<span class="accent">x</span></span></div>
-    <p>Mitsubishi parts catalogue</p>
+    <p>{t("app.tagline")}</p>
   </div>
 {/if}
 

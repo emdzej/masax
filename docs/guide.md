@@ -229,6 +229,23 @@ Some codes have no description: 171 of the codes the catalogue uses have no
 entry in its own option table. Those show as bare codes rather than being
 dropped.
 
+### Language and theme
+
+The gear opens **Settings**, which has two tabs.
+
+**User interface** carries the language masax speaks — English or Polish, or
+whichever of those your browser asks for — and the theme. Both apply the moment
+you pick them, so there is nothing to save; the panel says so and offers Done.
+
+**Data location** keeps the discs, the hosted tree, and the language the
+_catalogue's own text_ is read in. That is a different setting: masax's words
+and Mitsubishi's words are independent, and the catalogue's coverage is partial
+— German translates about a quarter of its strings and French a third — so a
+Polish interface over an English parts list is the normal case, not a fault.
+
+The theme control also sits in the toolbar, left of the gear, for a quick
+switch.
+
 ### Report, and copying
 
 - **Report**, on the vehicle strip, prints everything the data holds about the

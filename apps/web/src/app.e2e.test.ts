@@ -456,6 +456,94 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
     }
   });
 
+  it("comes up in the browser's language, and can be overridden", async () => {
+    /*
+     * Its own context, and that matters: the language is a property of the
+     * browser and of `localStorage`, so changing it on the shared page would
+     * leave every later assertion in this file looking for English in a Polish
+     * interface.
+     */
+    const polish = await browser.newContext({ locale: "pl-PL" });
+    const page2 = await polish.newPage();
+    try {
+      await page2.goto(base);
+      // Detected from `navigator.languages`, with no interaction at all.
+      await expect.poll(() => page2.evaluate(() => document.documentElement.lang)).toBe("pl");
+      expect(await page2.locator('[role="dialog"] h2').textContent()).toContain(
+        "Lokalizacja danych",
+      );
+
+      await page2.getByPlaceholder(/example\.org/).fill(`${base}${modulePath(DATA!)}`);
+      await page2.getByRole("button", { name: "Otwórz", exact: true }).click();
+      await page2.locator("select#catalogue").waitFor({ timeout: 90_000 });
+
+      // Two tabs, named in Polish, and the override switches the whole thing.
+      await page2.locator(".tools button.icon").last().click();
+      expect(await page2.locator("button.tab").allTextContents()).toEqual([
+        "Lokalizacja danych",
+        "Interfejs",
+      ]);
+      await page2.getByRole("tab", { name: "Interfejs" }).click();
+      await page2.getByRole("button", { name: "English", exact: true }).click();
+      await expect.poll(() => page2.evaluate(() => document.documentElement.lang)).toBe("en");
+      expect(await page2.locator("button.tab").allTextContents()).toEqual([
+        "Data location",
+        "User interface",
+      ]);
+      // Remembered, so the next visit opens in the chosen language rather than
+      // going back to the browser's.
+      expect(await page2.evaluate(() => localStorage.getItem("masax.locale.v1"))).toBe("en");
+
+      // The interface tab commits nothing, so it offers Done rather than Save.
+      const footer = (await page2.locator('[role="dialog"] footer').textContent()) ?? "";
+      expect(footer.replace(/\s+/g, " ")).toContain("apply as you pick them");
+      expect(footer).toContain("Done");
+      expect(footer).not.toContain("Open catalogue");
+    } finally {
+      await polish.close();
+    }
+  }, 120_000);
+
+  it("counts in Polish with one, few and many", async () => {
+    const polish = await browser.newContext({ locale: "pl-PL" });
+    const page2 = await polish.newPage();
+    try {
+      await page2.goto(base);
+      await page2.getByPlaceholder(/example\.org/).fill(`${base}${modulePath(DATA!)}`);
+      await page2.getByRole("button", { name: "Otwórz", exact: true }).click();
+      await page2.locator("select#catalogue").waitFor({ timeout: 90_000 });
+      await page2.locator("input#vin").fill("JMB0RV250RJ000188");
+      await page2.getByRole("button", { name: "Dekoduj" }).click();
+      await expect
+        .poll(() => page2.locator("select#model").inputValue(), { timeout: 30_000 })
+        .toBe("V25W");
+      await page2.getByRole("button", { name: /^13\s/ }).click();
+      await page2
+        .locator("section.rail")
+        .last()
+        .locator("button.row")
+        .filter({ hasText: "FUEL FILLER PIPE" })
+        .click();
+      await expect
+        .poll(() => page2.locator("section.panel tbody tr").count(), { timeout: 30_000 })
+        .toBe(11);
+
+      // 11 and 19 are both `many` in Polish — `wierszy`, not `wiersze` — and 8
+      // hidden rows is `many` too. This is the case a `count === 1` ternary
+      // gets wrong.
+      const count = (await page2.locator("section.panel header .count").textContent()) ?? "";
+      expect(count.replace(/\s+/g, " ").trim()).toBe("11 z 19 wierszy · 11 kodów");
+      const note = (await page2.locator("section.panel footer").textContent()) ?? "";
+      expect(note.replace(/\s+/g, " ")).toContain("Ukryto 8 wierszy");
+      // The catalogue's own text stays English: it is a separate language.
+      expect(await page2.locator("section.panel tbody").textContent()).toContain(
+        "GASKET,FUEL FILLER NECK",
+      );
+    } finally {
+      await polish.close();
+    }
+  }, 120_000);
+
   it("filters the group list by number and by name", async () => {
     const groups = page.locator("section.rail").first();
     const before = await groups.locator("button.row").count();

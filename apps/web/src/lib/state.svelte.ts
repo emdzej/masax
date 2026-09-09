@@ -23,6 +23,7 @@ import {
   type VinRecord,
 } from "@masax/catalogue";
 import { EUROPE_LANGUAGES, type Language } from "@masax/core";
+import { i18n } from "./i18n/index.svelte";
 import {
   addDisc as pickDisc,
   canPickDirectory,
@@ -208,7 +209,7 @@ export class AppState {
   /** Open the chosen discs. */
   async open(settings: Settings = loadSettings()): Promise<void> {
     this.error = "";
-    this.busy = "Opening the catalogue…";
+    this.busy = i18n.t("app.opening");
     try {
       const opened = openDiscs(this.discs);
       await this.load(opened.fs);
@@ -365,7 +366,7 @@ export class AppState {
   async selectPlate(plate: GroupRef): Promise<void> {
     if (!this.catalogue || !this.selectedCatalogue || !this.selectedModel) return;
     this.selectedPlate = plate;
-    this.busy = "Reading the parts…";
+    this.busy = i18n.t("app.readingParts");
     try {
       this.parts = await this.catalogue.partsForPlate(
         this.selectedCatalogue,
@@ -401,7 +402,7 @@ export class AppState {
     this.vinError = "";
     this.vehicleCatalogue = undefined;
     this.optionSet = undefined;
-    this.busy = "Looking up the vehicle…";
+    this.busy = i18n.t("app.lookingUp");
     try {
       const result = await this.catalogue.vin.decode(this.vinInput);
       this.vehicle = result.matches[0];

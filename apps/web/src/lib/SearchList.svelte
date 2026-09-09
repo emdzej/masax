@@ -10,6 +10,9 @@
 <script lang="ts">
   import { Search, X } from "@lucide/svelte";
   import Diamond from "./Diamond.svelte";
+  import { i18n } from "./i18n/index.svelte";
+
+  const t = $derived(i18n.t);
 
   export interface ListItem {
     /** Stable identity for keying and selection. */
@@ -74,7 +77,7 @@
       <Search size={13} strokeWidth={2} />
       <input bind:value={query} {placeholder} onkeydown={onKey} spellcheck="false" />
       {#if query}
-        <button class="clear" onclick={() => (query = "")} aria-label="Clear filter">
+        <button class="clear" onclick={() => (query = "")} aria-label={t("rail.clear")}>
           <X size={12} strokeWidth={2.5} />
         </button>
       {/if}
@@ -84,7 +87,7 @@
   {#if items.length === 0}
     <p class="hint">{emptyHint}</p>
   {:else if matches.length === 0}
-    <p class="hint">No match for “{query}”.</p>
+    <p class="hint">{t("rail.noMatch", { query })}</p>
   {:else}
     <ul>
       {#each matches as item (item.key)}

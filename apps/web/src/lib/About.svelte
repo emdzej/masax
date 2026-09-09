@@ -9,6 +9,9 @@
   import Diamond from "./Diamond.svelte";
   import GithubMark from "./GithubMark.svelte";
   import { REPOSITORY, VERSION, releaseUrl } from "./build";
+  import { i18n } from "./i18n/index.svelte";
+
+  const t = $derived(i18n.t);
 
   let { onClose }: { onClose: () => void } = $props();
 </script>
@@ -17,7 +20,7 @@
 
 <div class="scrim" role="presentation">
   <button class="backdrop" onclick={onClose} aria-label="Close" tabindex="-1"></button>
-  <div class="panel" role="dialog" aria-modal="true" aria-label="About masax" tabindex="-1">
+  <div class="panel" role="dialog" aria-modal="true" aria-label={t("about.title")} tabindex="-1">
     <header>
       <Diamond size={11} />
       <h2>masa<span class="x">x</span></h2>
@@ -25,34 +28,21 @@
         {VERSION}
       </a>
       <div class="spacer"></div>
-      <button class="icon" onclick={onClose} aria-label="Close"><X size={15} /></button>
+      <button class="icon" onclick={onClose} aria-label={t("settings.close")}><X size={15} /></button>
     </header>
 
     <div class="body">
-      <p>
-        A parts catalogue for Mitsubishi vehicles, read from your own copy of the After
-        Sales Application discs. It runs entirely in the browser: the data is read where
-        it lies, and nothing is uploaded.
-      </p>
-      <p>
-        The catalogue format, the CCITT Group 4 drawings and the callout hotspots were
-        worked out by reading the data, and the findings are documented in the
-        repository alongside the code that reads them.
-      </p>
-      <p class="fine">
-        Not affiliated with or endorsed by Mitsubishi. The catalogue data is Mitsubishi's
-        and is not distributed with this software — you supply your own discs. masax is
-        interoperability work: understanding a 2008 format so the information can be read
-        on current systems.
-      </p>
+      <p>{t("about.body1")}</p>
+      <p>{t("about.body2")}</p>
+      <p class="fine">{t("about.fine")}</p>
     </div>
 
     <footer>
       <a href={REPOSITORY} target="_blank" rel="noreferrer noopener">
-        <GithubMark size={13} /> Source and documentation
+        <GithubMark size={13} /> {t("about.source")}
       </a>
       <div class="spacer"></div>
-      <span class="fine">PolyForm Noncommercial 1.0.0</span>
+      <span class="fine">{t("about.licence")}</span>
     </footer>
   </div>
 </div>

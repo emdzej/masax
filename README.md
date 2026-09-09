@@ -96,8 +96,15 @@ screen. Group and plate are filterable lists on the left, matching on the number
 as well as the name, because the number is often what you already know. The
 drawing gets the larger share of the width, with the parts beside it.
 
-Light and dark, with a third state that follows the system and keeps following
-it. Dark repaints the plate light-on-dark from the decoded bitmap rather than
+English and Polish, and light and dark, each with a third state that follows
+the browser or the system and keeps following it. The interface language is
+separate from the catalogue's own — masax's words and Mitsubishi's are
+independent settings, and they live on the two tabs of the settings panel.
+
+i18next is in there for one reason worth naming: Polish needs one/few/many
+where English needs one/other, so `11 wierszy` and `3 wiersze` are different
+words. That is `Intl.PluralRules` territory and a `count === 1` ternary gets it
+wrong for most numbers. Dark repaints the plate light-on-dark from the decoded bitmap rather than
 filtering it — a 960x1210 white rectangle is the largest thing on screen, and a
 CSS filter would invert the callout highlights with it.
 
@@ -147,6 +154,8 @@ hidden rows and the reason are always shown. See
 
 ## Read this next
 
+- **[`CHANGELOG.md`](CHANGELOG.md)** — what changed in each release, with the
+  numbers behind each format finding.
 - **[`docs/guide.md`](docs/guide.md)** — the user guide: mounting the discs,
   importing, and finding a part.
 - **[`docs/how-it-works.md`](docs/how-it-works.md)** — how ASA works and how to
