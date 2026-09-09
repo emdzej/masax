@@ -106,6 +106,7 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
   let server: Server;
   let base: string;
   let browser: import("playwright-core").Browser;
+  let context: import("playwright-core").BrowserContext;
   let page: import("playwright-core").Page;
 
   beforeAll(async () => {
@@ -115,7 +116,8 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
     ]));
     const { chromium } = await import("playwright-core");
     browser = await chromium.launch({ channel: "chrome" });
-    page = await browser.newPage();
+    context = await browser.newContext();
+    page = await context.newPage();
     const problems: string[] = [];
     page.on("pageerror", (error) => problems.push(error.message));
     page.on("response", (response) => {
@@ -169,9 +171,11 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
     await expect.poll(() => block.textContent()).toMatch(/960×1210/);
     expect(await block.textContent()).toContain("13-010");
 
-    const rows = page.locator("tbody tr");
+    // Scoped to the panel: the vehicle report renders its own tables, hidden
+    // but present in the DOM, and a bare `tbody` selector counts those too.
+    const rows = page.locator("section.panel tbody tr");
     await expect.poll(() => rows.count(), { timeout: 30_000 }).toBeGreaterThan(30);
-    const text = await page.locator("tbody").textContent();
+    const text = await page.locator("section.panel tbody").textContent();
     expect(text).toContain("FUEL TANK ASSY");
     expect(text).toContain("MB247182");
   });
@@ -236,7 +240,7 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
     const lists: string[][] = [];
     for (let i = 0; i < 3; i++) {
       await tanks.nth(i).click();
-      const rows = page.locator("tbody tr");
+      const rows = page.locator("section.panel tbody tr");
       await expect.poll(() => rows.count(), { timeout: 30_000 }).toBeGreaterThan(0);
       lists.push(
         await page
@@ -254,9 +258,9 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
 
     // The filler-pipe plate is the small one, and it is filler-pipe parts.
     await tanks.first().click();
-    await expect.poll(() => page.locator("tbody tr").count()).toBe(19);
-    expect(await page.locator("tbody").textContent()).toContain("PIPE,FUEL FILLER");
-    expect(await page.locator("tbody").textContent()).not.toContain("FUEL PUMP ASSY");
+    await expect.poll(() => page.locator("section.panel tbody tr").count()).toBe(19);
+    expect(await page.locator("section.panel tbody").textContent()).toContain("PIPE,FUEL FILLER");
+    expect(await page.locator("section.panel tbody").textContent()).not.toContain("FUEL PUMP ASSY");
   });
 
   it("pans the drawing at actual size, without the drag selecting a callout", async () => {
@@ -338,6 +342,118 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
     // and the theme control sits to its left, not the other way round
     const swatch = (await page.locator(".tools button.icon").first().boundingBox())!;
     expect(swatch.x).toBeLessThan(cog.x);
+  });
+
+  it("narrows the parts list to the decoded vehicle, and can be switched off", async () => {
+    // The vehicle from the VIN tests below is a V25W built 1994-03. On the
+    // filler-pipe plate that leaves one row per callout: the later part numbers
+    // for 05014, 05078, 05079, 05114, 05178 and 05292 are all later periods.
+    await page.selectOption("select#catalogue", "B60356A4A");
+    await page.selectOption("select#model", "V25W");
+    await page.locator("input#vin").fill("JMB0RV250RJ000188");
+    await page.getByRole("button", { name: "Decode" }).click();
+    await expect
+      .poll(() => page.locator("select#model").inputValue(), { timeout: 30_000 })
+      .toBe("V25W");
+    await page.getByRole("button", { name: /^13\s/ }).click();
+    // By name, not by position: decoding the VIN reopens the catalogue and
+    // model, which rebuilds this list, and an index taken before that resolves
+    // lands on whichever plate the previous test had selected.
+    await page
+      .locator("section.rail")
+      .last()
+      .locator("button.row")
+      .filter({ hasText: "FUEL FILLER PIPE" })
+      .click();
+    await expect
+      .poll(() => page.locator("figcaption.block").textContent(), { timeout: 30_000 })
+      .toMatch(/113_0103KC1B5T/);
+
+    const rows = page.locator("section.panel tbody tr");
+    await expect.poll(() => rows.count(), { timeout: 30_000 }).toBe(11);
+    // Every dropped row goes on the build date, and the footnote says so.
+    const footnote = (await page.locator("section.panel footer").textContent()) ?? "";
+    expect(footnote.replace(/\s+/g, " ")).toMatch(/8 rows hidden.*build date/);
+
+    await page.locator("label.switch input").uncheck();
+    await expect.poll(() => rows.count()).toBe(19);
+    await page.locator("label.switch input").check();
+    await expect.poll(() => rows.count()).toBe(11);
+  });
+
+  it("copies a part number and a part name from a row", async () => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    const row = page.locator("section.panel tbody tr").first();
+    const buttons = row.locator("button.copy");
+    expect(await buttons.count()).toBe(2);
+
+    // Hidden until the row is pointed at, and not clickable while hidden —
+    // otherwise every part number on the plate carries an invisible control.
+    expect(await buttons.first().evaluate((el) => getComputedStyle(el).opacity)).toBe("0");
+    expect(await buttons.first().evaluate((el) => getComputedStyle(el).pointerEvents)).toBe("none");
+    await row.hover();
+    await expect
+      .poll(() => buttons.first().evaluate((el) => getComputedStyle(el).opacity))
+      .toBe("1");
+
+    await buttons.first().click();
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe("MA152319");
+    // Copying is not selecting: the row's own click must not have fired.
+    expect(await page.locator("tbody tr.linked").count()).toBe(0);
+
+    await buttons.nth(1).click();
+    await expect
+      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+      .toBe("GASKET,FUEL FILLER NECK");
+  });
+
+  it("copies the plate as an image", async () => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.locator("button.zoom.copy").click();
+    // The tick only appears when the clipboard write resolved.
+    await expect
+      .poll(() => page.locator("button.zoom.copy.ok").count(), { timeout: 10_000 })
+      .toBe(1);
+  });
+
+  it("prints a vehicle report, and hides the interface while doing it", async () => {
+    const report = page.locator("section.report");
+    expect(await report.count()).toBe(1);
+    expect(await report.evaluate((el) => getComputedStyle(el).display)).toBe("none");
+
+    // `window.print` would block on a dialog, so it is stubbed and the media
+    // switched by hand. What matters is the stylesheet, not the dialog.
+    await page.addInitScript(() => {
+      window.print = () => {};
+    });
+    await page.getByRole("button", { name: "Report" }).click();
+
+    await page.emulateMedia({ media: "print" });
+    try {
+      expect(await report.evaluate((el) => getComputedStyle(el).display)).toBe("block");
+      expect(await page.locator("header.bar").evaluate((el) => getComputedStyle(el).display)).toBe(
+        "none",
+      );
+      const text = await report.innerText();
+      // Everything the VIN gave, including fields the strip has no room for.
+      for (const wanted of [
+        "JMB0RV250RJ000188",
+        "V25W",
+        "GRXML6",
+        "1994-03 (early)",
+        "H70",
+        "D9H",
+        "44D",
+        "serial J000153",
+        "PAJERO/MONTERO(EUR)",
+        "VARIABLE SHOCK ABSORBER",
+        "SWISS SPEC",
+      ]) {
+        expect(text, `report should carry ${wanted}`).toContain(wanted);
+      }
+    } finally {
+      await page.emulateMedia({ media: "screen" });
+    }
   });
 
   it("filters the group list by number and by name", async () => {

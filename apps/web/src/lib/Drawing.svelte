@@ -26,6 +26,8 @@
 -->
 <script lang="ts">
   import { tick } from "svelte";
+  import Check from "@lucide/svelte/icons/check";
+  import Copy from "@lucide/svelte/icons/copy";
   import ImageOff from "@lucide/svelte/icons/image-off";
   import Maximize2 from "@lucide/svelte/icons/maximize-2";
   import Minimize2 from "@lucide/svelte/icons/minimize-2";
@@ -41,6 +43,7 @@
   } from "@masax/illust";
   import { formatAsaDateShort } from "@masax/core";
   import { theme } from "./theme.svelte";
+  import { canvasToPng, copyImage } from "./clipboard";
   import type { AsaCatalogue, GroupRef } from "@masax/catalogue";
 
   let {
@@ -76,6 +79,25 @@
 
   /** True while a drag is panning the frame, which also suppresses the click. */
   let panning = $state(false);
+
+  /** "" | "ok" | "no" — the result of the last copy, shown briefly on the button. */
+  let copied = $state("");
+
+  /**
+   * Copy the plate as a PNG.
+   *
+   * The canvas is copied as painted, so it carries the current theme — a plate
+   * copied in dark mode is light-on-dark, which is what was on screen and what
+   * the user asked for. The blob is produced inside the call rather than
+   * awaited first, because Safari only accepts a pending promise handed to
+   * `ClipboardItem` from within the gesture.
+   */
+  async function copyDrawing(): Promise<void> {
+    const element = canvas;
+    if (!element) return;
+    copied = (await copyImage(() => canvasToPng(element))) ? "ok" : "no";
+    setTimeout(() => (copied = ""), 1800);
+  }
 
   /**
    * The decoded bitmap, held so a theme change is a repaint rather than a
@@ -306,6 +328,16 @@
   -->
   {#if name && !problem}
     <button
+      class="zoom copy"
+      class:ok={copied === "ok"}
+      class:no={copied === "no"}
+      onclick={() => void copyDrawing()}
+      title={copied === "no" ? "The browser refused the clipboard" : "Copy the plate as an image"}
+      aria-label="Copy the plate as an image"
+    >
+      {#if copied === "ok"}<Check size={13} />{:else}<Copy size={13} />{/if}
+    </button>
+    <button
       class="zoom"
       onclick={toggleActual}
       title={actual ? "Fit to the column" : "Show at actual size, and drag to pan"}
@@ -464,6 +496,18 @@
   .zoom:hover {
     border-color: var(--red);
     color: var(--red);
+  }
+  /* Left of the zoom control, which keeps the corner it already had. */
+  .copy {
+    right: 2.05rem;
+  }
+  .copy.ok {
+    border-color: var(--red);
+    color: var(--red);
+  }
+  .copy.no {
+    border-color: var(--steel-light);
+    text-decoration: line-through;
   }
 
   .block {

@@ -64,6 +64,13 @@
     background: var(--scrim);
     display: grid;
     place-items: center;
+    /*
+     * A definite row, so the panel's `max-height: 100%` has something to
+     * resolve against. With the default `auto` row, 100% is 100% of the
+     * content — the panel grows past the viewport and the scroll container
+     * inside it never engages.
+     */
+    grid-template-rows: minmax(0, 1fr);
     padding: 1.5rem;
     z-index: 60;
   }
@@ -77,6 +84,8 @@
   .panel {
     position: relative;
     width: min(31rem, 100%);
+    max-height: 100%;
+    overflow: auto;
     background: var(--sheet);
     border: 1px solid var(--rule);
     border-top: 2px solid var(--red);

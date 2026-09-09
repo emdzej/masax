@@ -18,6 +18,7 @@ import { Dataset, listDirectory, type LexRecord } from "@masax/lex";
 import { deobfuscate, readIfd, hotspotsFromTiff, HOTSPOT_TAG } from "@masax/illust";
 import { TextTable } from "./text.js";
 import { VinIndex } from "./vin.js";
+import { OptionTable, type OptionSet } from "./options.js";
 import { CATALOGUE_DATASETS } from "./datasets.js";
 
 /**
@@ -135,6 +136,7 @@ export class AsaCatalogue {
     readonly dataDir: string,
     readonly text: TextTable,
     readonly vin: VinIndex,
+    readonly options: OptionTable,
     private readonly info: CatalogueInfo[],
     private readonly mainGroups: LexRecord[],
     private readonly subGroups: LexRecord[],
@@ -148,6 +150,7 @@ export class AsaCatalogue {
 
     const textTable = await TextTable.open(fs, dataDir, language);
     const vin = await VinIndex.open(fs, dataDir);
+    const optionTable = await OptionTable.open(fs, dataDir, textTable);
 
     const cinfo = await Dataset.open(fs, dataDir, "CInfo");
     const info: CatalogueInfo[] = [];
@@ -179,6 +182,7 @@ export class AsaCatalogue {
       dataDir,
       textTable,
       vin,
+      optionTable,
       info,
       await load("MGroup"),
       await load("SGroup"),
@@ -512,7 +516,24 @@ export class AsaCatalogue {
     return (await this.partsTable(id)).filter((row) => row.partNumber?.toUpperCase() === wanted);
   }
 
+  /**
+   * What a vehicle's OPC stands for.
+   *
+   * The OPC alone is not enough: several `Opc` records can share a
+   * `(model, opc)` and differ by classification and date window, so the
+   * decoded vehicle is passed whole. See `options.ts`.
+   */
+  async optionsFor(vehicle: {
+    model?: string;
+    opc?: string;
+    classification?: string;
+    productionDate?: AsaDate;
+  }): Promise<OptionSet | undefined> {
+    return this.options.resolve(vehicle);
+  }
+
   async close(): Promise<void> {
     await this.vin.close();
+    await this.options.close();
   }
 }

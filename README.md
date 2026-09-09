@@ -128,11 +128,21 @@ plates the rule accounts for **99.72%** of subgroup codes and halves a plate's
 list. A code that no drawing of the subgroup claims stays on every plate of it,
 because losing a real part is worse than showing a spare one.
 
-**Applicability to a particular vehicle is still not filtered.** Every surviving
-row is shown with its conditions visible — OPC, classification, applicable
-codes, date window. How ASA combines those into "fits this vehicle" has not been
-established here, and a wrong filter hides a part that fits or offers one that
-does not without saying so. See
+**And it narrows to the vehicle.** A part row's `E1` — labelled `OPC` — is not
+a pack code but one of the _expanded_ option codes: the vehicle's `H70` is a
+pack, `Opc` expands it to 34 options, and `E1` is one of those. Measured over
+every `E1`-bearing row of one catalogue, the code lies inside that model's own
+pack vocabulary in **112,636 of 112,636 rows, with no exceptions**.
+
+So a row applies when its date window contains the build date, its
+classification list contains the vehicle's, and its option code is in the
+expanded pack. Across 350 plates of one `V25W` that takes 4.96 rows per
+part-name code down to 1.87, and `13-010 FUEL FILLER PIPE` from 19 rows to
+exactly 11 — one per callout printed on the drawing.
+
+What is _not_ confirmed is that the three tests combine with `and`. So the
+narrowing is a switch in the parts-list header, on by default, and the number of
+hidden rows and the reason are always shown. See
 [`docs/data-format.md`](docs/data-format.md#what-is-not-established).
 
 ## Read this next

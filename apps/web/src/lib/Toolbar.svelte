@@ -9,6 +9,7 @@
 -->
 <script lang="ts">
   import Cog from "@lucide/svelte/icons/cog";
+  import Printer from "@lucide/svelte/icons/printer";
   import Monitor from "@lucide/svelte/icons/monitor";
   import Moon from "@lucide/svelte/icons/moon";
   import Sun from "@lucide/svelte/icons/sun";
@@ -36,6 +37,8 @@
     onModel,
     onSettings,
     onAbout,
+    onOptions,
+    onReport,
   }: {
     catalogues: CatalogueInfo[];
     selectedCatalogue?: string;
@@ -52,6 +55,8 @@
     onModel: (model: string) => void;
     onSettings: () => void;
     onAbout: () => void;
+    onOptions: () => void;
+    onReport: () => void;
   } = $props();
 </script>
 
@@ -167,12 +172,35 @@
         <dt class="label">Built</dt>
         <dd class="code">{formatAsaDate(vehicle.productionDate) || "—"}</dd>
         <dt class="label">OPC</dt>
-        <dd class="code">{vehicle.opc ?? "—"}</dd>
+        <dd class="code">
+          <!--
+            The OPC is a key, not a reading: `H70` stands for 34 options. So the
+            value itself is the button rather than an icon beside it — there is
+            nothing else here a user would want to click, and the underline says
+            it leads somewhere.
+          -->
+          {#if vehicle.opc}
+            <button class="opc code" onclick={onOptions} title="What {vehicle.opc} includes">
+              {vehicle.opc}
+            </button>
+          {:else}
+            —
+          {/if}
+        </dd>
         <dt class="label">Paint</dt>
         <dd class="code">{vehicle.paint ?? "—"}</dd>
         <dt class="label">Trim</dt>
         <dd class="code">{vehicle.interior ?? "—"}</dd>
       </dl>
+      <!--
+        On the strip rather than in the bar above, because what it prints *is*
+        the strip: the vehicle, not the catalogue or the plate. It sits after
+        the values so it reads as an action on them.
+      -->
+      <button class="report" onclick={onReport} title="Print a report for this vehicle">
+        <Printer size={13} />
+        <span>Report</span>
+      </button>
       <span class="via">
         {#if resolved}
           opened <span class="code">{resolved.name ?? resolved.catalogue}</span> from
@@ -348,6 +376,41 @@
   }
 
   /* The vehicle strip: the answer to "which car", kept on screen. */
+  .report {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    flex: none;
+    padding: 0.15rem 0.4rem;
+    border: 1px solid var(--rule);
+    border-radius: var(--r);
+    background: var(--sheet);
+    color: var(--steel);
+    font: 600 10px/1 var(--ui);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+  .report:hover {
+    border-color: var(--red);
+    color: var(--red);
+  }
+
+  .opc {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font-weight: inherit;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+    text-decoration-color: var(--steel-light);
+  }
+  .opc:hover {
+    color: var(--red);
+    text-decoration-color: var(--red);
+  }
+
   .strip {
     display: flex;
     align-items: center;

@@ -17,7 +17,9 @@ import {
   type CatalogueInfo,
   type GroupRef,
   type PartRow,
+  type OptionSet,
   type VehicleCatalogue,
+  type VehicleFit,
   type VinRecord,
 } from "@masax/catalogue";
 import { EUROPE_LANGUAGES, type Language } from "@masax/core";
@@ -73,6 +75,27 @@ export class AppState {
   vinError = $state("");
   /** How the catalogue and model were picked from the VIN, for the interface. */
   vehicleCatalogue = $state<VehicleCatalogue | undefined>(undefined);
+  /** What the vehicle's OPC stands for, read alongside the VIN. */
+  optionSet = $state<OptionSet | undefined>(undefined);
+  optionsOpen = $state(false);
+  optionsBusy = $state(false);
+  /** Whether the parts list narrows to the decoded vehicle. */
+  narrowed = $state(true);
+
+  /**
+   * What the parts list narrows by, or undefined when nothing has been decoded.
+   *
+   * Undefined rather than an empty object: the switch is only offered when
+   * there is a vehicle to narrow to, and picking a catalogue by hand is not one.
+   */
+  get vehicleFit(): VehicleFit | undefined {
+    if (!this.vehicle) return undefined;
+    return {
+      classification: this.vehicle.classification,
+      productionDate: this.vehicle.productionDate,
+      options: this.optionSet ? new Set(this.optionSet.options.map((o) => o.code)) : undefined,
+    };
+  }
 
   private restoring = false;
 
@@ -377,6 +400,7 @@ export class AppState {
     if (!this.catalogue) return;
     this.vinError = "";
     this.vehicleCatalogue = undefined;
+    this.optionSet = undefined;
     this.busy = "Looking up the vehicle…";
     try {
       const result = await this.catalogue.vin.decode(this.vinInput);
@@ -395,6 +419,10 @@ export class AppState {
         classification: this.vehicle.classification,
       });
       this.vehicleCatalogue = resolved;
+      // Read the option pack now rather than when the panel is opened: the
+      // parts list narrows by it, so it has to be there before the first plate
+      // is shown. It is one bounded range read.
+      this.optionSet = await this.catalogue.optionsFor(this.vehicle);
       if (resolved) {
         this.selectCatalogue(resolved.catalogue);
         if (this.models.includes(resolved.model)) this.selectModel(resolved.model);
@@ -406,5 +434,35 @@ export class AppState {
     } finally {
       this.busy = "";
     }
+  }
+
+  /**
+   * Open the options panel, reading the pack the first time it is asked for.
+   *
+   * On demand rather than with the VIN: it is a range read into a 6.7 MB file
+   * that most lookups never need, and decoding a VIN is already the slowest
+   * thing the interface does.
+   */
+  /**
+   * Read the option pack, once.
+   *
+   * Normally `decodeVin` has already done it; this covers a vehicle restored
+   * from the last session, where nothing was decoded this time round.
+   */
+  async loadOptions(): Promise<void> {
+    if (!this.catalogue || !this.vehicle || this.optionSet) return;
+    this.optionsBusy = true;
+    try {
+      this.optionSet = await this.catalogue.optionsFor(this.vehicle);
+    } catch (cause) {
+      this.error = (cause as Error).message;
+    } finally {
+      this.optionsBusy = false;
+    }
+  }
+
+  async showOptions(): Promise<void> {
+    this.optionsOpen = true;
+    await this.loadOptions();
   }
 }

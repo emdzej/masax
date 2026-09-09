@@ -10,31 +10,88 @@
   table. That is deliberate: the part number is what gets read out to a
   customer, and everything else on the row exists to justify it.
 
-  Nothing here is filtered by applicability. The data carries an OPC, a
-  classification list, applicable codes and a date range, but how ASA combines
-  them into "fits this vehicle" has not been established, and a filter that is
-  wrong hides a part that fits or offers one that does not. So every row is
-  shown with its conditions visible.
+  The list narrows to the decoded vehicle by default, on the build date, the
+  classification and the option pack — see `applicability.ts` for the rule and
+  what is measured about it. The header carries the switch, because that is
+  where the row count is and the count is what changes.
+
+  Hidden rows are counted and their reason named. That matters: the rule is
+  consistent with everything measured but has not been checked against the
+  original application's own output, so a row disappearing has to be visible as
+  a decision rather than as an absence.
 -->
 <script lang="ts">
+  import Check from "@lucide/svelte/icons/check";
+  import Copy from "@lucide/svelte/icons/copy";
   import Info from "@lucide/svelte/icons/info";
-  import type { GroupRef, PartRow } from "@masax/catalogue";
+  import { fitsVehicle, type FitFailure, type GroupRef, type PartRow, type VehicleFit } from "@masax/catalogue";
   import { formatAsaDateShort } from "@masax/core";
+  import { copyText } from "./clipboard";
 
   let {
     parts,
     plate,
     activePnc,
+    vehicle,
+    narrowed = $bindable(true),
     onSelect,
   }: {
     parts: PartRow[];
     plate?: GroupRef;
     /** Linked callout, set from here or from the drawing. */
     activePnc?: string;
+    /** What to narrow by. Absent when no VIN has been decoded. */
+    vehicle?: VehicleFit;
+    narrowed?: boolean;
     onSelect?: (pnc: string) => void;
   } = $props();
 
+  /** Only offer the switch when a decoded vehicle gives it something to do. */
+  const canNarrow = $derived(Boolean(vehicle));
+
+  const shown = $derived(
+    canNarrow && narrowed ? parts.filter((row) => fitsVehicle(row, vehicle!).fits) : parts,
+  );
+
+  /** Why the hidden rows went, most common first, for one honest sentence. */
+  const hidden = $derived.by(() => {
+    if (!canNarrow || !narrowed) return { count: 0, reasons: [] as FitFailure[] };
+    const tally = new Map<FitFailure, number>();
+    let count = 0;
+    for (const row of parts) {
+      const fit = fitsVehicle(row, vehicle!);
+      if (fit.fits) continue;
+      count++;
+      for (const reason of fit.reasons) tally.set(reason, (tally.get(reason) ?? 0) + 1);
+    }
+    return {
+      count,
+      reasons: [...tally.entries()].sort((a, b) => b[1] - a[1]).map(([reason]) => reason),
+    };
+  });
+
+  const REASON: Record<FitFailure, string> = {
+    date: "outside this vehicle's build date",
+    classification: "another classification",
+    option: "an option this vehicle does not have",
+  };
+
   let body = $state<HTMLTableSectionElement | undefined>(undefined);
+
+  /**
+   * Which cell was copied last, so the tick appears on that one alone.
+   *
+   * A key rather than a boolean: the same part number can legitimately appear
+   * on two rows of one plate, and a flag would tick both.
+   */
+  let copied = $state("");
+
+  async function copy(key: string, value: string, event: MouseEvent): Promise<void> {
+    // The row's own click selects the callout; copying is not that.
+    event.stopPropagation();
+    copied = (await copyText(value)) ? key : "";
+    setTimeout(() => (copied = ""), 1600);
+  }
 
   // When the drawing picks a callout the row may be far down a list of ninety,
   // so bring it into view rather than leaving the user to hunt for it.
@@ -52,11 +109,11 @@
     return `${from || "?"} – ${to || "?"}`;
   };
 
-  const codes = $derived(new Set(parts.map((p) => p.pnc)).size);
+  const codes = $derived(new Set(shown.map((p) => p.pnc)).size);
   /** A run of rows sharing a part-name code is one callout on the drawing. */
   const firstOfCode = $derived.by(() => {
     const seen = new Set<string>();
-    return parts.map((p) => {
+    return shown.map((p) => {
       const first = !seen.has(p.pnc);
       seen.add(p.pnc);
       return first;
@@ -67,14 +124,42 @@
 <section class="panel">
   <header>
     <span class="label">Parts</span>
-    {#if parts.length > 0}
-      <span class="count code">{parts.length} / {codes} codes</span>
+    <div class="spacer"></div>
+    {#if canNarrow}
+      <label class="switch" title="Narrow to the decoded vehicle: build date, classification and option pack">
+        <input type="checkbox" bind:checked={narrowed} />
+        <span>This vehicle</span>
+      </label>
+    {/if}
+    {#if shown.length > 0}
+      <!--
+        Named, not bare. `19 / 11 codes` reads as "19 of 11", which is
+        nonsense: the two numbers count different things, and the code count
+        stays put while rows come and go because one code can hold several
+        period rows. When rows are hidden the count says so, which is the
+        question the switch raises.
+      -->
+      <span class="count code">
+        {#if hidden.count > 0}
+          {shown.length} of {parts.length} rows
+        {:else}
+          {shown.length} {shown.length === 1 ? "row" : "rows"}
+        {/if}
+        · {codes} {codes === 1 ? "code" : "codes"}
+      </span>
     {/if}
   </header>
 
-  {#if parts.length === 0}
+  {#if shown.length === 0}
     <p class="none">
-      {plate ? "No parts on this plate." : "Choose a plate to see its parts."}
+      {#if !plate}
+        Choose a plate to see its parts.
+      {:else if parts.length > 0}
+        None of this plate's {parts.length} rows fit this vehicle. Untick “This vehicle” to
+        see them.
+      {:else}
+        No parts on this plate.
+      {/if}
     </p>
   {:else}
     <div class="scroll">
@@ -90,7 +175,7 @@
           </tr>
         </thead>
         <tbody bind:this={body}>
-          {#each parts as part, i (`${part.pnc}-${part.partNumber}-${i}`)}
+          {#each shown as part, i (`${part.pnc}-${part.partNumber}-${i}`)}
             <tr
               data-pnc={part.pnc}
               class:group-start={firstOfCode[i] && i > 0}
@@ -98,10 +183,41 @@
               onclick={() => onSelect?.(part.pnc)}
             >
               <td class="code pnc">{firstOfCode[i] ? part.pnc : ""}</td>
-              <td class="code part">{part.partNumber ?? ""}</td>
+              <!--
+                The copy control lives in the cell it copies, so there is no
+                guessing what it takes. It is in the flow at zero opacity rather
+                than absent, so revealing it shifts nothing.
+              -->
+              <td class="code part">
+                {part.partNumber ?? ""}
+                {#if part.partNumber}
+                  {@const key = `n${i}`}
+                  <button
+                    class="copy"
+                    class:done={copied === key}
+                    onclick={(e) => void copy(key, part.partNumber!, e)}
+                    title="Copy {part.partNumber}"
+                    aria-label="Copy part number {part.partNumber}"
+                  >
+                    {#if copied === key}<Check size={11} />{:else}<Copy size={11} />{/if}
+                  </button>
+                {/if}
+              </td>
               <td class="code num">{part.quantity ?? ""}</td>
               <td class="name">
                 {part.name ?? ""}
+                {#if part.name}
+                  {@const key = `d${i}`}
+                  <button
+                    class="copy"
+                    class:done={copied === key}
+                    onclick={(e) => void copy(key, part.name!, e)}
+                    title="Copy “{part.name}”"
+                    aria-label="Copy part name {part.name}"
+                  >
+                    {#if copied === key}<Check size={11} />{:else}<Copy size={11} />{/if}
+                  </button>
+                {/if}
                 {#if part.feature}<span class="feature">{part.feature}</span>{/if}
               </td>
               <td class="code period">{dates(part)}</td>
@@ -131,14 +247,136 @@
     <footer>
       <Info size={12} />
       <span>
-        Click a row or a callout on the plate to link the two. The list is this plate's
-        drawing; dates and codes are shown, not applied to the vehicle.
+        {#if hidden.count > 0}
+          {hidden.count} row{hidden.count === 1 ? "" : "s"} hidden:
+          {hidden.reasons.map((r) => REASON[r]).join(", ")}.
+        {:else}
+          Click a row or a callout on the plate to link the two. The list is this plate's
+          drawing.
+        {/if}
       </span>
     </footer>
   {/if}
 </section>
 
 <style>
+  /*
+   * Revealed, not added. Ninety rows each carrying two visible buttons is a
+   * wall of icons, so they sit at zero opacity and appear for the row in
+   * question — on hover where there is a hovering pointer, and on the selected
+   * row where there is not, because a touch user's only way to indicate a row
+   * is to tap it, which is already what selects a callout.
+   *
+   * `pointer-events: none` while hidden matters: an invisible button that is
+   * still clickable would put a copy control over every part number on the
+   * plate. Keyboard focus is unaffected by it, so tabbing in still reveals
+   * them through `:focus-within`.
+   */
+  .copy {
+    display: inline-flex;
+    vertical-align: -1px;
+    margin-left: 0.3rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--steel-light);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 90ms linear;
+  }
+  tr.linked .copy,
+  tr:focus-within .copy {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    tr:hover .copy {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+  .copy:hover {
+    color: var(--red);
+  }
+  .copy.done {
+    color: var(--red);
+    opacity: 1;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .copy {
+      transition: none;
+    }
+  }
+
+  .spacer {
+    flex: 1;
+  }
+  /*
+   * A checkbox rather than a button: it is a state the user is holding, not an
+   * action, and the label has to name what is being narrowed to. Small and
+   * quiet, because the count beside it is what people actually read.
+   */
+  .switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font: 600 10px/1 var(--ui);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--steel);
+    cursor: pointer;
+    user-select: none;
+  }
+  .switch:hover {
+    color: var(--ink);
+  }
+  /*
+   * Drawn rather than native. A native checkbox is 11px tall in Chrome and
+   * larger still in Safari and Firefox, which enforce a minimum regardless of
+   * `width`/`height` — against 7.25px cap height that reads as misaligned even
+   * when the boxes are centred to a hundredth of a pixel. Sizing it to the cap
+   * height is the only way to make it look right, and that needs
+   * `appearance: none`. It also makes the control identical in every browser
+   * and lets it take the theme's own accent.
+   */
+  .switch input {
+    appearance: none;
+    -webkit-appearance: none;
+    position: relative;
+    flex: none;
+    margin: 0;
+    width: 9px;
+    height: 9px;
+    border: 1px solid var(--rule);
+    border-radius: 1px;
+    background: var(--sheet);
+    cursor: pointer;
+  }
+  .switch input:checked {
+    border-color: var(--red);
+    background: var(--red);
+  }
+  /* The tick: two borders of a box, rotated. Small enough that a glyph would
+     not survive the scaling. */
+  .switch input:checked::after {
+    content: "";
+    position: absolute;
+    left: 1px;
+    top: 0;
+    width: 3px;
+    height: 5px;
+    border: solid var(--on-red);
+    border-width: 0 1.5px 1.5px 0;
+    transform: rotate(42deg);
+  }
+  .switch input:focus-visible {
+    outline: 2px solid var(--red);
+    outline-offset: 1px;
+  }
+  .switch:has(input:checked) {
+    color: var(--red);
+  }
+
   .panel {
     display: flex;
     flex-direction: column;

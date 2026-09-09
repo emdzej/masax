@@ -626,25 +626,97 @@ differ from an updated tree even where the logical content agrees. The update
 packages on disc A exist to bring _older installations_ forward; they are not a
 patch series for the media itself.
 
+## An OPC is a pack, and `catalog.E1` is one of its options
+
+A vehicle's OPC is not a feature. `H70` on a `V25W` is a **pack code**, and
+`Opc` expands it into the option codes it stands for:
+
+```
+Opc(V25W, H70) -> [A28, A88, C15, ...] -> OInfo -> Desc -> "DIFF LOCK"
+```
+
+`Opc` keys on `(Model, Opc)` and carries a repeating group of
+`(Classification, Year, StartDate, EndDate)` — up to 50 entries — plus one flat
+`Option` array that applies to all of them. **The window is on the
+classification, not on the record.** `V25W`/`H70` has two records, both
+`GRXML6`: 1993-11 to 1994-05 with 34 options, and 1994-06 to 1995-08 with 35.
+
+The pair is unambiguous, measured rather than assumed: across all 41,030
+`(model, opc)` pairs, **no two records overlap in date for the same
+classification**, so classification and build date select at most one.
+
+Two practical notes. The **stored order is not the display order** — `Opc`
+writes `SER, SFH, SH6, SNN, SSP, SXE, SXH, S30, S70`, letters before digits,
+while the original application shows `S30, S70` first, which is plain ASCII. And
+**171 of the 3,083 codes `Opc` uses have no `OInfo` row**, absent under any
+spelling, though `OInfo` describes 6,223 codes in total.
+
+> Verified against the original application's own output for one vehicle: 34
+> options, same order, same text.
+
+### `catalog.E1` is an option code
+
+This is what makes applicability tractable. `E1` is labelled `OPC` in the `.ddm`
+and is **not** a pack code — it is one of the expanded option codes. Over every
+`E1`-bearing row of `PAJERO/MONTERO(EUR)`:
+
+| Vocabulary                     | Matches           |
+| ------------------------------ | ----------------- |
+| `OInfo` — option codes         | 365 of 365 (100%) |
+| codes any pack uses (`Opc.C0`) | 365 of 365 (100%) |
+| `Opc.A1` — pack codes          | 161 of 365 (44%)  |
+| `pnc`                          | 0                 |
+| model codes                    | 0                 |
+
+And per row rather than per distinct value: the code lies inside **that model's
+own** pack vocabulary in **112,636 of 112,636 rows, with no exceptions**.
+
+So a part row applies to a vehicle when all three hold, each vacuously true when
+its field is empty:
+
+| Field                    | Test                                     |
+| ------------------------ | ---------------------------------------- |
+| `C1`/`C2`                | the build date falls inside, inclusive   |
+| `E2` classification list | it contains the vehicle's classification |
+| `E1` option code         | the vehicle's expanded pack contains it  |
+
+Over all 350 plates of a `V25W` built 1994-03, `GRXML6`, `H70`:
+
+| Stage            | Rows   | Rows per code | Codes with more than one row |
+| ---------------- | ------ | ------------- | ---------------------------- |
+| unfiltered       | 20,836 | 4.96          | 54.8%                        |
+| + date           | 8,010  | 2.11          | 13.8%                        |
+| + classification | 6,864  | 1.91          | 8.7%                         |
+| + options        | 6,685  | 1.87          | 7.7%                         |
+
+On `13-010 FUEL FILLER PIPE` that is 19 rows down to **11 — exactly one per
+callout printed on the drawing** — and every dropped row goes on date alone.
+
+The residual 7.7% is mostly not ambiguity. Of the 620 codes keeping more than
+one row: 216 give the _same_ part number twice, 72 are `L`/`R` pairs, 157 differ
+by an option code the pack holds both of, and 175 are variants a catalogue
+genuinely lists side by side — engine bearing grades like `03407`'s `MD169655`
+and `MD169656`, chosen by measurement rather than by VIN.
+
 ## What is not established
 
-Everything above is derived from the data and checked by `masax verify`. Two
-things are not, and are deliberately left un-guessed rather than approximated:
+Everything above is derived from the data and checked by `masax verify`. These
+two are inferences rather than measurements, and are called out as such:
 
-**Vehicle applicability inside a plate.** After the drawing narrows a plate to
-its own codes, several rows can remain for one code — `05014` has three, each
-with its own date window — and rows carry `OPC`, `Classification[100]` and
-`ApplicableCodes[1000]`. A decoded VIN gives a build date, an OPC and a
-classification, so the ingredients are all present. What is not known is how ASA
-_combines_ them: whether the tests are conjunctive, whether an empty
-classification means "all" or "unknown", and what `ApplicableCodes` indexes. The
-client therefore shows every surviving row with its conditions visible, and
-applies none of them. Settling it needs a vehicle whose correct parts list is
-known from outside the data — a printed microfiche page, or the original
-application's own output for a specific VIN.
+**That the three applicability tests are combined with `and`,** and that an
+empty field means "all" rather than "unknown". Both are consistent with
+everything measured above and neither is confirmed against the original
+application's output for a plate. Filtering removes 628 of 4,203 codes for the
+vehicle above — correctly as far as can be told, since each goes on a date
+window that plainly excludes the build date, but not verifiably. So the client
+narrows by default and says how many rows it hid and why, and the switch is in
+the parts-list header.
 
-**`ApplicableCodes` semantics.** An array of up to 1,000 `u16` on a part row. It
-is not resolved here.
+**`ApplicableCodes` (`E3`).** Not resolved, and not needed for the above. Its
+values are seven characters that read as a four-plus-three pair — `BD2 72H`,
+`B42A72H` — with 465 distinct heads and 119 distinct tails. The tails resemble
+trim codes and the heads exterior codes, but the overlap is too weak to claim:
+35 of 119 and 32 of 465 respectively.
 
 ## Reading a vehicle
 

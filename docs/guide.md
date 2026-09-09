@@ -200,17 +200,47 @@ stay red rather than being inverted along with everything else.
 | Period      | the build-date window this part number applies to       |
 | Applies     | the option and classification codes attached to the row |
 
-**Read the Period and Applies columns yourself.** masax shows every row a plate
-holds and does **not** narrow them to your particular vehicle. Where a code has
-three rows with three date windows, the one that matches your build date is the
-one you want — compare it against the date on the vehicle strip.
+### Narrowing to your vehicle
 
-This is deliberate. How the original application combines date, OPC,
-classification and applicable codes into "fits this vehicle" has not been
-established from the data, and a filter that gets it wrong would hide a part
-that fits, or offer one that does not, without saying so. Showing the conditions
-and leaving the judgement to you is the honest version. See
+Once you have decoded a VIN the list narrows to that vehicle, and the header
+carries the switch — **This vehicle**. Three things narrow it: the build date
+against each row's period, your classification against the row's list, and your
+option pack against the row's option code. The footnote says how many rows were
+hidden and why.
+
+Untick it to see everything the plate holds. Worth doing when a part you expect
+is missing: on `13-010 FUEL FILLER PIPE` for a 1994-03 Pajero, 19 rows become
+11 — one per number on the drawing — and all 8 hidden rows are later periods of
+the same parts.
+
+**The date test is arithmetic; the combination is inference.** A row whose period
+ends in 1994-05 plainly does not apply to a car built 1997-06. How the original
+application _combines_ the three tests is not confirmed, which is why the switch
+exists and the hidden-row count is always shown. See
 [`data-format.md`](data-format.md#what-is-not-established).
+
+### What an OPC means
+
+The OPC on the vehicle strip is a **pack code**, not a feature — `H70` stands
+for 34 separate options. Click it and the panel lists them with their codes and
+descriptions, and says which record it matched and on what.
+
+Some codes have no description: 171 of the codes the catalogue uses have no
+entry in its own option table. Those show as bare codes rather than being
+dropped.
+
+### Report, and copying
+
+- **Report**, on the vehicle strip, prints everything the data holds about the
+  vehicle — VIN, chassis and serial, model, classification, build date, OPC with
+  its full option list, paint, trim, exterior, and the catalogue it resolved to.
+  One sheet, black on white whatever theme you are using.
+- **The drawing** has a copy button beside the zoom control, which puts the
+  plate on the clipboard as an image. It copies what is on screen, so a plate
+  copied in dark mode is light-on-dark.
+- **A part number or name** copies from its own cell. Point at a row and small
+  copy buttons appear beside the number and the name; on a touch screen, tap the
+  row first. Copying does not change which callout is selected.
 
 ## 7. From the command line
 

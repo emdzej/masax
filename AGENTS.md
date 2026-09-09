@@ -148,6 +148,25 @@ the Pajero I catalogue and simply not the one for that model. **Before
 concluding two code sets are unrelated, check a pair the data says belongs
 together.**
 
+## A field's label is not its vocabulary
+
+`catalog.E1` is labelled **OPC** in the `.ddm`, and it is not a pack code. A
+vehicle's OPC — `H70` — is a pack that `Opc` expands into option codes; `E1` is
+one of the _expanded_ codes. Believing the label means testing `E1` against
+`H70`, which never matches, and concluding that applicability cannot be
+resolved. What settled it was membership: all 365 distinct values are in
+`OInfo`, and per row the code lies inside that model's own pack vocabulary in
+112,636 of 112,636 cases.
+
+**The general lesson:** when a field's meaning is in doubt, check its values
+against every candidate vocabulary in the schema rather than reading its name.
+It is a five-minute query and it has now been decisive twice.
+
+Applicability therefore _is_ narrowable — date window, classification list,
+expanded option code — but that the three combine with `and` remains an
+inference. Keep the switch, keep the hidden-row count visible, and never drop a
+row silently.
+
 ## The parts table does not key to a plate
 
 `catalog` keys to `(model, main group, subgroup)`. Several plates can share a

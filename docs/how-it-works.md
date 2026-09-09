@@ -201,6 +201,8 @@ The parts that matter for navigation:
                          ▼
      catalog[<cat id>] ─► part rows for (model, main group, subgroup)
                          ▼
+     Opc ───────────────► the OPC pack expanded to option codes
+     OInfo ─────────────► option code → text
      pnc / pnc_desc ────► part-name code → text
      Desc_<lang> ───────► every display string, by text serial
      PBook ─────────────► part master: maker, colour, material, supersession
@@ -419,30 +421,43 @@ step that caused it rather than three steps later.
 | 9   | plate↔parts narrowing     | `V25W 13-010` → 11 / 32 / 28 codes over three plates       |
 | 10  | VIN decode with XREF      | `…RJ000188` → `V25W`, class `GRXML6`, built 1994-03        |
 | 11  | VIN → catalogue via VInfo | 167,446 spec-bearing records, none ambiguous               |
+| 12  | `Opc` + `OInfo`           | `V25W`/`H70` → 34 options for a 1994-03 build              |
+| 13  | applicability             | `13-010` filler pipe → 11 rows, one per callout            |
 
 Steps 1–4 are the foundation and the only ones where a subtle error is invisible
 — hence the emphasis on the consume-exactly assertion. Steps 7–8 are
 self-checking. Step 9 is the one that needs a plate you can eyeball against its
-drawing.
+drawing. Step 12 is worth doing before 13: an option pack is
+checkable against a build sheet, and step 13 depends on it.
 
 ## 12. What is not established
 
-Two things, deliberately not guessed:
+Two inferences, called out as such:
 
-**Vehicle applicability inside a plate.** After the drawing narrows a plate to
-its own codes, several rows can survive for one code — `05014` has three, each
-with its own date window — and rows carry `OPC`, `Classification[100]` and
-`ApplicableCodes[1000]`. A decoded VIN gives a build date, an OPC and a
-classification, so every ingredient is present. What is unknown is how ASA
-_combines_ them: whether the tests are conjunctive, whether an empty
-classification means "all" or "unknown", and what `ApplicableCodes` indexes.
-masax therefore shows every surviving row with its conditions visible and
-applies none of them. Settling it needs a vehicle whose correct parts list is
-known **from outside the data** — a printed microfiche page, or the original
-application's own output for a specific VIN.
+**That the three applicability tests are combined with `and`,** and that an
+empty field means "all" rather than "unknown".
 
-**`ApplicableCodes`.** An array of up to 1,000 `u16` on a part row. Not
-resolved.
+The tests themselves are identified. A part row's `E1` is an **option code, not
+a pack code** — the vehicle's OPC is a pack that `Opc` expands, and `E1` is one
+of the expanded codes. That is measured: `E1` lies inside the model's own pack
+vocabulary in 112,636 of 112,636 rows. So a row applies when the build date is
+in `C1..C2`, the vehicle's classification is in `E2`, and `E1` is in the
+expanded pack. Together those take a plate from 4.96 rows per part-name code to
+1.87, and `13-010 FUEL FILLER PIPE` from 19 rows to exactly 11 — one per callout
+on the drawing.
+
+What is _not_ confirmed is the combination. Filtering removes 628 of 4,203 codes
+for that vehicle, each on a date window that plainly excludes its build date,
+and that looks right — but "looks right" is not the original application's own
+output for a plate, which is still the thing to check against. So masax narrows
+by default, states how many rows it hid and why, and puts the switch in the
+parts-list header.
+
+**`ApplicableCodes` (`E3`).** Not resolved, and not needed for the above. Seven
+characters reading as a four-plus-three pair — `BD2 72H`, `B42A72H` — 465
+distinct heads and 119 distinct tails. Tails resemble trim codes and heads
+exterior codes, but only 35 of 119 and 32 of 465 actually match those
+vocabularies, which is too weak to claim.
 
 Also not built here, though nothing about them looks hard: search by part number
 and by label across a catalogue, and surfacing the `rep` supersession chains in
@@ -463,6 +478,8 @@ each one survived for a while:
 | The hotspot tag's declared count bounds the blob | it is short; read to EOF                                     |
 | VIN model codes are a separate vocabulary        | same vocabulary; I had compared against a catalogue id       |
 | A VIN splits from the left                       | from the right — only the serial has a fixed length          |
+| `catalog.E1` is an OPC, as its label says        | it is one of the _expanded_ option codes, not the pack       |
+| Applicability could not be narrowed at all       | date, classification and `E1` take 4.96 rows/code to 1.87    |
 
 The pattern in all of them: a claim derived from one artifact, or from a
 plausible-looking sample, that nothing in the pipeline was positioned to

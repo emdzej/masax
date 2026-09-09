@@ -12,14 +12,43 @@
   import Drawing from "./lib/Drawing.svelte";
   import PartsList from "./lib/PartsList.svelte";
   import SearchList, { type ListItem } from "./lib/SearchList.svelte";
+  import Options from "./lib/Options.svelte";
+  import Report from "./lib/Report.svelte";
   import About from "./lib/About.svelte";
   import Settings from "./lib/Settings.svelte";
   import Toolbar from "./lib/Toolbar.svelte";
   import { AppState } from "./lib/state.svelte";
+  import { tick } from "svelte";
   import "./lib/theme.css";
 
   const app = new AppState();
   let aboutOpen = $state(false);
+
+  /**
+   * Stamped when printing rather than read in the component.
+   *
+   * The report is rendered continuously once a vehicle is decoded — it has to
+   * be in the DOM for the print stylesheet to reach it — so a clock read during
+   * render would tick with every unrelated update.
+   */
+  let printedAt = $state("");
+
+  /**
+   * Print the vehicle report.
+   *
+   * The option pack is fetched first when it is not already loaded, because the
+   * report lists it and a print dialog cannot wait for a range read. Normally
+   * `decodeVin` has it.
+   */
+  async function printReport(): Promise<void> {
+    if (!app.vehicle) return;
+    if (!app.optionSet) await app.loadOptions();
+    printedAt = new Date().toLocaleString();
+    // A tick, so the stamp and any freshly loaded options are in the DOM before
+    // the browser snapshots the page.
+    await tick();
+    window.print();
+  }
 
   onMount(() => {
     const tree = new URLSearchParams(location.search).get("tree") ?? undefined;
@@ -82,6 +111,8 @@
     onModel={(m) => app.selectModel(m)}
     onSettings={() => (app.settingsOpen = true)}
     onAbout={() => (aboutOpen = true)}
+    onOptions={() => void app.showOptions()}
+    onReport={() => void printReport()}
   />
 
   <div class="work">
@@ -123,6 +154,8 @@
         parts={app.parts}
         plate={app.selectedPlate}
         {activePnc}
+        vehicle={app.vehicleFit}
+        bind:narrowed={app.narrowed}
         onSelect={(pnc) => (activePnc = activePnc === pnc ? undefined : pnc)}
       />
     </main>
@@ -143,6 +176,24 @@
 
 {#if aboutOpen}
   <About onClose={() => (aboutOpen = false)} />
+{/if}
+
+{#if app.vehicle}
+  <Report
+    vin={app.vinInput}
+    vehicle={app.vehicle}
+    resolved={app.vehicleCatalogue}
+    options={app.optionSet}
+    {printedAt}
+  />
+{/if}
+
+{#if app.optionsOpen}
+  <Options
+    set={app.optionSet}
+    busy={app.optionsBusy}
+    onClose={() => (app.optionsOpen = false)}
+  />
 {/if}
 
 {#if app.settingsOpen}
