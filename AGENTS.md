@@ -148,18 +148,25 @@ the Pajero I catalogue and simply not the one for that model. **Before
 concluding two code sets are unrelated, check a pair the data says belongs
 together.**
 
-## `csfs-fsa` cannot create a directory when opened case-insensitively
+## The offline copy writes case-sensitively
 
-`dir(path, create)` resolves each segment with `findChild`, which returns null
-when the directory is absent — and then `dir` returns null instead of creating
-it. `fileHandle` has the fallback it is missing (`?? (create ? name : null)`).
-So a **write** to any nested path fails outright when `caseInsensitive: true`,
-which is why the offline copy opens its OPFS target case-sensitively and only
-reads it back case-insensitively. Worth fixing upstream.
+Fixed in `csfs-fsa` 0.1.1, and worth knowing what it was: `dir(path, create)`
+resolved each segment with `findChild`, got null for an absent directory, and
+returned null instead of creating it — so a **write** to any nested path failed
+outright when `caseInsensitive: true`. It failed as
+`EPC/DATA1/A/PREF.BIN: could not be created` after writing nothing at all, and
+the copy looked merely slow rather than broken; the only reason it was found is
+that a probe watched `navigator.storage.estimate()` and saw it flat.
 
-It failed as `EPC/DATA1/A/PREF.BIN: could not be created` after writing nothing
-at all, and the copy looked merely slow rather than broken — the only reason it
-was found is that a probe watched `navigator.storage.estimate()` and saw it flat.
+The copy still opens its target case-sensitively, now on the merits: there is
+nothing to be insensitive about in a tree this creates from the source's own
+names, and case-insensitive resolution costs a full directory listing per path
+segment. Reading it back _does_ need it, because the two discs disagree on
+`Illust` versus `ILLUST`.
+
+**Replace deletes first.** Copying over an existing copy merges, which strands
+files from a previous source. And a copy can never run while the copy is itself
+the open source — it would delete what it is reading.
 
 ## The service worker must never see a range request
 

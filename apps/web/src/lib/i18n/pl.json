@@ -296,6 +296,7 @@
     "unsupported": "Ta przeglądarka nie potrafi zapisać kopii.",
     "delete": "Usuń kopię",
     "deleted": "Kopia została usunięta.",
-    "drawingsMatter": "Bez rysunków tablica pokazuje części całej podgrupy, a nie własne: o tym, które części należą do której tablicy, decydują odnośniki wydrukowane na rysunku."
+    "drawingsMatter": "Bez rysunków tablica pokazuje części całej podgrupy, a nie własne: o tym, które części należą do której tablicy, decydują odnośniki wydrukowane na rysunku.",
+    "isTheCopy": "To jest ta kopia."
   }
 }

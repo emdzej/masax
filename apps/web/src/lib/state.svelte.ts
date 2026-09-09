@@ -69,8 +69,15 @@ export class AppState {
 
   /** Whether a copy is already in this browser. Looked for once, on boot. */
   hasOfflineCopy = $state(false);
-  /** Progress of a copy in flight, or the result of the last one. */
+  /**
+   * Progress of a copy in flight. Empty when nothing is running.
+   *
+   * Separate from `offlineNote` on purpose: this one disables the button, and
+   * holding the *outcome* here left it disabled for good once a copy finished.
+   */
   offlineBusy = $state("");
+  /** What the last copy or delete did. Says something; disables nothing. */
+  offlineNote = $state("");
   offlineUsage = $state<{ usage: number; quota: number } | undefined>(undefined);
 
   catalogues = $state<CatalogueInfo[]>([]);
@@ -231,9 +238,22 @@ export class AppState {
   async keepCopyOffline(illustrations = false): Promise<void> {
     const source = this.fs;
     if (!source) return;
+    /*
+     * Refused when the copy *is* the open source. It would be copying the
+     * origin private filesystem onto itself, and the replace below would delete
+     * the thing being read halfway through.
+     */
+    if (this.saved?.kind === "offline") return;
     this.error = "";
+    this.offlineNote = "";
     this.offlineBusy = i18n.t("offline.starting");
     try {
+      /*
+       * Replace means replace. Copying over an existing one merges, which
+       * leaves files from a previous source behind — and if that source spelled
+       * a directory differently, two directories where there should be one.
+       */
+      if (this.hasOfflineCopy) await clearOffline();
       const result = await keepOffline(source, {
         illustrations,
         onProgress: (p: OfflineProgress) => {
@@ -244,13 +264,14 @@ export class AppState {
         },
       });
       this.hasOfflineCopy = true;
-      this.offlineBusy = i18n.t("offline.kept", {
+      this.offlineNote = i18n.t("offline.kept", {
         files: result.files,
         mb: Math.round(result.bytes / 1e6),
       });
       await this.refreshQuota();
     } catch (cause) {
       this.error = (cause as Error).message;
+    } finally {
       this.offlineBusy = "";
     }
   }
@@ -264,12 +285,12 @@ export class AppState {
    */
   async deleteOfflineCopy(): Promise<void> {
     this.error = "";
-    this.offlineBusy = "";
+    this.offlineNote = "";
     try {
       const wasOpen = this.saved?.kind === "offline";
       await clearOffline();
       this.hasOfflineCopy = false;
-      this.offlineBusy = i18n.t("offline.deleted");
+      this.offlineNote = i18n.t("offline.deleted");
       if (wasOpen) {
         this.catalogue = undefined;
         this.fs = undefined;

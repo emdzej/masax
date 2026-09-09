@@ -15,9 +15,9 @@
   },
   "dependencies": {
     "@commander-js/extra-typings": "^15.0.0",
-    "@emdzej/csfs-core": "^0.1.0",
-    "@emdzej/csfs-manifest": "^0.1.0",
-    "@emdzej/csfs-node": "^0.1.0",
+    "@emdzej/csfs-core": "^0.1.1",
+    "@emdzej/csfs-manifest": "^0.1.1",
+    "@emdzej/csfs-node": "^0.1.1",
     "@masax/catalogue": "workspace:*",
     "@masax/core": "workspace:*",
     "@masax/illust": "workspace:*",
@@ -25,7 +25,7 @@
     "chalk": "^6.0.0",
     "commander": "^15.0.0",
     "@masax/importer": "workspace:*",
-    "@emdzej/csfs-http": "^0.1.0"
+    "@emdzej/csfs-http": "^0.1.1"
   },
   "devDependencies": {
     "@types/node": "^22.13.1"

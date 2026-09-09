@@ -150,18 +150,20 @@ export async function keepOffline(
   options: { illustrations?: boolean; onProgress?: (p: OfflineProgress) => void } = {},
 ): Promise<{ files: number; bytes: number; granted: boolean }> {
   /*
-   * Case-sensitive on purpose, and it is not a preference.
+   * Case-sensitive on purpose.
    *
-   * `csfs-fsa`'s `dir(path, create)` resolves a segment with `findChild`, which
-   * returns null when the directory does not exist yet — and then returns null
-   * rather than creating it. So with `caseInsensitive: true` a *write* to any
-   * nested path fails: nothing under `EPC/` can be created. `fileHandle` has
-   * the fallback that `dir` is missing (`?? (create ? name : null)`).
+   * Until `csfs-fsa` 0.1.1 this was forced: `dir(path, create)` would not
+   * create a directory on a case-insensitive filesystem, so nothing under
+   * `EPC/` could be written at all. That is fixed, and the choice stands on its
+   * own merits.
    *
-   * The target does not need case-insensitivity anyway: this creates the tree
-   * from scratch with the source's own names. Reading it back does need it —
-   * the two discs disagree on `Illust` versus `ILLUST` — so `openOffline`
-   * keeps it.
+   * There is nothing here to be insensitive about — this creates the tree from
+   * scratch with the source's own names — and case-insensitive resolution costs
+   * a full directory listing for every segment of every path, which for a few
+   * hundred files is a few hundred listings bought for nothing.
+   *
+   * Reading it back *does* need it, because the two discs disagree on `Illust`
+   * versus `ILLUST`, so `openOffline` keeps it.
    */
   const target = await opfsFileSystem({ namespace: NAMESPACE });
   const granted = await persist();

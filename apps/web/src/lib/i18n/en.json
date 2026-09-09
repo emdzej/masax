@@ -276,6 +276,7 @@
     "unsupported": "This browser cannot keep a copy.",
     "delete": "Delete the copy",
     "deleted": "The copy is deleted.",
-    "drawingsMatter": "Without the drawings a plate shows its whole subgroup's parts rather than its own: which parts belong to which plate is decided by the callouts printed on the drawing."
+    "drawingsMatter": "Without the drawings a plate shows its whole subgroup's parts rather than its own: which parts belong to which plate is decided by the callouts printed on the drawing.",
+    "isTheCopy": "This is the copy."
   }
 }

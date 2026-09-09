@@ -311,13 +311,21 @@
               <input type="checkbox" bind:checked={withDrawings} />
               <span>{t("offline.withDrawings")}</span>
             </label>
-            <!-- Disabled with nothing open: there would be nothing to copy. -->
-            <button
-              onclick={() => void app.keepCopyOffline(withDrawings)}
-              disabled={!app.catalogue || Boolean(app.offlineBusy) || Boolean(busy)}
-            >
-              {app.hasOfflineCopy ? t("offline.replace") : t("offline.keep")}
-            </button>
+            <!--
+              Disabled with nothing open, and when the copy is what is open:
+              there would be nothing to copy in the first case and nothing to
+              copy *from* in the second.
+            -->
+            {#if saved?.kind === "offline"}
+              <span class="note">{t("offline.isTheCopy")}</span>
+            {:else}
+              <button
+                onclick={() => void app.keepCopyOffline(withDrawings)}
+                disabled={!app.catalogue || Boolean(app.offlineBusy) || Boolean(busy)}
+              >
+                {app.hasOfflineCopy ? t("offline.replace") : t("offline.keep")}
+              </button>
+            {/if}
           </div>
           <!--
             Said out loud, because it is not guessable: the plate-to-parts join
@@ -332,7 +340,10 @@
               <Trash2 size={12} /> {t("offline.delete")}
             </button>
           {/if}
-          {#if app.offlineBusy}<p class="note">{app.offlineBusy}</p>{/if}
+          <!-- Progress while it runs, the outcome afterwards. -->
+          {#if app.offlineBusy || app.offlineNote}
+            <p class="note">{app.offlineBusy || app.offlineNote}</p>
+          {/if}
         </section>
       {/if}
 

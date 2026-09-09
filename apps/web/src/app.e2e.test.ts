@@ -811,12 +811,48 @@ describe.skipIf(!DATA || !existsSync(DIST))("the browser client", () => {
         return names;
       });
       expect(top).toEqual(["EPC"]);
+      const files = await page2.evaluate(async () => {
+        const root = await navigator.storage.getDirectory();
+        const count = async (dir: FileSystemDirectoryHandle): Promise<number> => {
+          let n = 0;
+          for await (const [, handle] of dir.entries()) {
+            n += handle.kind === "file" ? 1 : await count(handle as FileSystemDirectoryHandle);
+          }
+          return n;
+        };
+        return count(await root.getDirectoryHandle("masax"));
+      });
+      expect(files).toBeGreaterThan(100);
+
+      /*
+       * Replacing deletes first. Copying over an existing copy would merge,
+       * leaving files from a previous source behind — and a differently-cased
+       * directory twice where there should be one.
+       */
+      await page2.getByRole("button", { name: "Replace the copy" }).click();
+      await expect
+        .poll(() => page2.locator('[role="dialog"]').innerText(), { timeout: 600_000 })
+        .toMatch(/Kept \d+ files/);
+      expect(
+        await page2.evaluate(async () => {
+          const root = await navigator.storage.getDirectory();
+          const ns = await root.getDirectoryHandle("masax");
+          const names: string[] = [];
+          for await (const [name] of ns.entries()) names.push(name);
+          return names;
+        }),
+      ).toEqual(["EPC"]);
 
       // Read it back with the network down: no permission, no host.
       await page2.getByRole("button", { name: "Open the copy" }).click();
       await expect
         .poll(() => page2.evaluate(() => localStorage.getItem("masax.settings.v1")))
         .toContain('"kind":"offline"');
+      // With the copy open there is nothing to copy *from*, so the action is
+      // replaced by a statement of fact rather than left to delete its own source.
+      await page2.locator(".tools button.cog").click();
+      expect(await page2.locator('[role="dialog"]').innerText()).toContain("This is the copy");
+      await page2.keyboard.press("Escape");
 
       await own.setOffline(true);
       await page2.reload({ waitUntil: "domcontentloaded" });
