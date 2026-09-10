@@ -228,6 +228,12 @@ to read the media; they are what backs the update-package sections of
 that preceded `packages/lex` is gone: it validated only the indexed records,
 which is how the record count came to be understated fivefold.
 
+## Support
+
+If you find this project useful, consider [buying me a coffee](https://buymeacoffee.com/emdzej) ☕ or [sponsoring on GitHub](https://github.com/sponsors/emdzej) or if it's your thing: via PayPal
+
+[![Donate with PayPal](https://www.paypalobjects.com/en_US/PL/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?business=TDBR3A97PLQRQ&no_recurring=0&item_name=%28emdzej%29&currency_code=PLN)
+
 ## Licence and intent
 
 This is interoperability work on a 2008 catalogue: understanding a data format
