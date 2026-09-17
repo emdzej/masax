@@ -148,6 +148,28 @@ the Pajero I catalogue and simply not the one for that model. **Before
 concluding two code sets are unrelated, check a pair the data says belongs
 together.**
 
+## An await in the middle of navigation will undo a click
+
+`decodeVin` opened the resolved catalogue and model _after_ awaiting the option
+pack. Both of those discard the selected group, plate and parts, so a group
+clicked while the pack was loading was silently reset — and it took a faster
+backend to make the window wide enough to notice.
+
+Two rules come out of it. **Settle the navigation before you await anything**,
+and **make `selectCatalogue`/`selectModel` no-ops when the value is unchanged**:
+everything in them is a discard, which is right for a change and wrong for a
+re-selection.
+
+## The HTTP backend requires real range support
+
+`ranges: "require"`, against csfs 0.2.0's `"auto"` default. `"auto"` reads a
+whole body and slices it locally, which is correct and is the right default for
+most data — but here a record read is two hundred bytes against a 76 MB
+`VIN.BIN`, above the 16 MiB whole-body cache, so one VIN decode would transfer
+76 MB and the next would transfer it again. Failing names the host, which is the
+thing that can be fixed. Whole-dataset reads still work: they ask for
+`bytes=0-<size>` and get a 206.
+
 ## The offline copy writes case-sensitively
 
 Fixed in `csfs-fsa` 0.1.1, and worth knowing what it was: `dir(path, create)`

@@ -65,9 +65,17 @@
 
   const matches = $derived.by(() => {
     const q = query.trim().toLowerCase();
-    // An open box with an untouched query lists everything: the user clicked to
-    // browse, not to search.
-    if (!open || !q || q === selected?.label.toLowerCase()) return items;
+    /*
+     * An open box with an untouched query lists everything: the user clicked to
+     * browse, not to search. `query` starts empty on every open, so `!q` is the
+     * whole of that condition.
+     *
+     * There used to be a second clause here — treat a query equal to the
+     * current selection as untouched — which was redundant with `!q` and wrong
+     * besides: typing a value out in full is a search for it, and it returned
+     * the entire list with the wrong row first.
+     */
+    if (!open || !q) return items;
     return items.filter(
       (item) =>
         item.label.toLowerCase().includes(q) ||

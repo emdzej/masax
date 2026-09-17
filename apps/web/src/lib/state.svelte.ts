@@ -474,8 +474,17 @@ export class AppState {
     }
   }
 
+  /**
+   * Choosing the catalogue that is already chosen changes nothing.
+   *
+   * Not a micro-optimisation: everything below this line *discards* the group,
+   * the plate and the parts. Re-selecting the same catalogue would throw away a
+   * selection the user had made since, which is precisely what `decodeVin` did
+   * when its tail landed late.
+   */
   selectCatalogue(id: string): void {
     if (!this.catalogue) return;
+    if (id === this.selectedCatalogue) return;
     this.selectedCatalogue = id;
     this.models = this.catalogue.models(id);
     this.selectedModel = undefined;
@@ -488,8 +497,10 @@ export class AppState {
     this.remember();
   }
 
+  /** Same reasoning as `selectCatalogue`: re-selecting is not re-setting. */
   selectModel(model: string): void {
     if (!this.catalogue || !this.selectedCatalogue) return;
+    if (model === this.selectedModel) return;
     this.selectedModel = model;
     this.mainGroups = this.catalogue.mainGroupsFor(this.selectedCatalogue, model);
     this.selectedMainGroup = undefined;
@@ -566,14 +577,24 @@ export class AppState {
         classification: this.vehicle.classification,
       });
       this.vehicleCatalogue = resolved;
-      // Read the option pack now rather than when the panel is opened: the
-      // parts list narrows by it, so it has to be there before the first plate
-      // is shown. It is one bounded range read.
-      this.optionSet = await this.catalogue.optionsFor(this.vehicle);
+
+      /*
+       * Open the catalogue and model *before* reading the option pack.
+       *
+       * Both of these reset the group, plate and parts, so they have to happen
+       * while the user is still waiting rather than after an await — otherwise
+       * a click on a group in the meantime is silently undone. That is what it
+       * used to do, and it only became visible when a faster backend changed
+       * the timing.
+       */
       if (resolved) {
         this.selectCatalogue(resolved.catalogue);
         if (this.models.includes(resolved.model)) this.selectModel(resolved.model);
       }
+
+      // The pack only feeds the parts filter, so it is fine for it to arrive
+      // after the navigation has settled. One bounded range read.
+      this.optionSet = await this.catalogue.optionsFor(this.vehicle);
       this.remember();
     } catch (cause) {
       this.vehicle = undefined;

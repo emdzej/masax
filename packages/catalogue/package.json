@@ -1,6 +1,6 @@
 {
   "name": "@masax/catalogue",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "description": "ASA domain: catalogues, groups, plates, parts, VIN decoding, supersession",
   "license": "PolyForm-Noncommercial-1.0.0",
@@ -19,7 +19,7 @@
     "clean": "rm -rf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
-    "@emdzej/csfs-core": "^0.1.1",
+    "@emdzej/csfs-core": "^0.2.0",
     "@masax/core": "workspace:*",
     "@masax/illust": "workspace:*",
     "@masax/lex": "workspace:*"

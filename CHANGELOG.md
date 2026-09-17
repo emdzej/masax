@@ -8,6 +8,49 @@ as much as its evidence — the reasoning behind each one is in
 Versions follow [semantic versioning](https://semver.org/). Before 1.0 a minor
 bump is where features land.
 
+## 0.4.1
+
+### Changed
+
+- **csfs 0.2.0.** Two of its new options are adopted and one is deliberately
+  not.
+
+  `caseInsensitive` on the HTTP backend, matching the picked-folder and OPFS
+  backends, which already open that way. The two discs disagree about `Illust`
+  versus `ILLUST`, so a hosted tree built from one of them now answers for the
+  other's spelling — and it is free here, being one map over a manifest already
+  in memory.
+
+  `ranges: "require"`, against the new `"auto"` default. `"auto"` is the right
+  default for most data and the wrong one for this: a record read is about two
+  hundred bytes, `VIN.BIN` is 76 MB, and it is larger than the 16 MiB
+  whole-body cache — so a host that ignored `Range` would transfer 76 MB to
+  decode one VIN, then transfer it again for the next. Failing points at the
+  host, which is the thing that can be fixed. Whole-dataset reads are
+  unaffected: they ask for `bytes=0-<size>` and get a 206.
+
+  Also inherited without any change here: `csfs-node` no longer drops symlinks
+  from a listing, so a symlinked file can no longer be missing from a manifest
+  `masax import` writes; and `csfs-fsa` no longer caches a directory miss
+  forever or keeps a stale handle after a removal, which is the path the offline
+  copy writes through.
+
+### Fixed
+
+- **Decoding a VIN could undo a click made while it was working.** It opened
+  the resolved catalogue and model _after_ awaiting the option pack, and both of
+  those discard the selected group, plate and parts — so a group clicked in the
+  meantime was silently reset. The navigation now settles before the pack is
+  read, since the pack only feeds the parts filter. csfs 0.2.0's different
+  timing is what surfaced it; the race was always there.
+- **Re-selecting the catalogue or model that is already selected no longer
+  resets anything.** Everything in those two methods discards the group, plate
+  and parts, which is right for a change and wrong for a no-op.
+- **The catalogue and model boxes ignored a query that matched the current
+  selection**, returning the whole list with the wrong row first. Typing a value
+  out in full is a search for it. The clause that did this was also redundant:
+  the query is empty on every open, which is the case it was meant to cover.
+
 ## 0.4.0
 
 ### Installable, and it opens with no network

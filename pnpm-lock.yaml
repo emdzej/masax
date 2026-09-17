@@ -33,17 +33,17 @@ importers:
         specifier: ^15.0.0
         version: 15.0.0(commander@15.0.0)
       '@emdzej/csfs-core':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.2.0
+        version: 0.2.0
       '@emdzej/csfs-http':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.2.0
+        version: 0.2.0
       '@emdzej/csfs-manifest':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.2.0
+        version: 0.2.0
       '@emdzej/csfs-node':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.2.0
+        version: 0.2.0
       '@masax/catalogue':
         specifier: workspace:*
         version: link:../../packages/catalogue
@@ -73,20 +73,20 @@ importers:
   apps/web:
     dependencies:
       '@emdzej/csfs-core':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.2.0
+        version: 0.2.0
       '@emdzej/csfs-fsa':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.2.0
+        version: 0.2.0
       '@emdzej/csfs-http':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.2.0
+        version: 0.2.0
       '@emdzej/csfs-manifest':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.2.0
+        version: 0.2.0
       '@emdzej/csfs-opfs':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.2.0
+        version: 0.2.0
       '@lucide/svelte':
         specifier: ^1.40.0
         version: 1.42.0(svelte@5.57.0)
@@ -134,8 +134,8 @@ importers:
   packages/catalogue:
     dependencies:
       '@emdzej/csfs-core':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.2.0
+        version: 0.2.0
       '@masax/core':
         specifier: workspace:*
         version: link:../core
@@ -157,14 +157,14 @@ importers:
   packages/importer:
     dependencies:
       '@emdzej/csfs-core':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.2.0
+        version: 0.2.0
 
   packages/lex:
     dependencies:
       '@emdzej/csfs-core':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.2.0
+        version: 0.2.0
       '@masax/core':
         specifier: workspace:*
         version: link:../core
@@ -687,23 +687,23 @@ packages:
     peerDependencies:
       commander: ~15.0.0
 
-  '@emdzej/csfs-core@0.1.1':
-    resolution: {integrity: sha512-DzGom1UQFjG+oGGBWyCO9Kn+bUgaiD2v3ndakM30GuIc3j6ZVWJyzjZpDfbKczPjDJaAUP3VWl1WgL3WSG/L8Q==}
+  '@emdzej/csfs-core@0.2.0':
+    resolution: {integrity: sha512-rL5mwhjVRQg4XAa7p71hdt4SHIfGQ/mE+8mGtUCl6l4gVTDwcdzXlWHW1s0Zl81RfUnL214LxA48FzH4MI0ZEg==}
 
-  '@emdzej/csfs-fsa@0.1.1':
-    resolution: {integrity: sha512-eSojxueo2gU3txIQusDc7LknuzdJIBWSj/FRgsGcluUXrWh5bemfevrTvv4e+STtmGMGn9KRNwQjWm+5bvYPDw==}
+  '@emdzej/csfs-fsa@0.2.0':
+    resolution: {integrity: sha512-92T7mg+4c8IA0mNStItD0mtD2NA2HKcLtx1g6NrlylMtoPMAgB4G0hYjonhGOvkwirqRS7nCdbi0G0AF7EkIuw==}
 
-  '@emdzej/csfs-http@0.1.1':
-    resolution: {integrity: sha512-96x9cm3Wun9JOYwTf03/+ZZnqGDyRnHHn0rYS5g/9ieVv7CI1vnlHlxmCCtD5qMi76WWhk0xryYRZQxZwPNfnQ==}
+  '@emdzej/csfs-http@0.2.0':
+    resolution: {integrity: sha512-5looLw5oP85t93+BwJkT1ifXKbOLUiaXYAVO8ZmglDVCHypsShErBycXwiYIlWV9gHtFV9zRh+ds0Id4lGUsUw==}
 
-  '@emdzej/csfs-manifest@0.1.1':
-    resolution: {integrity: sha512-WPxs1aEo2Bg4vRRmFeu7g9uj2hvBAJPXYOWS1rGyHSgM47MrtjZErgHtDjHiPZpIX58OQQM5T4r3Uib+0FVZkQ==}
+  '@emdzej/csfs-manifest@0.2.0':
+    resolution: {integrity: sha512-9TLRqryT2Fkmaz/4GLx5Hyb7YaknUzaC+mhhzrzz7nbBjzBrPh5ohXSqw0u80j0ye+DCd4831SbBp2nACjQiXw==}
 
-  '@emdzej/csfs-node@0.1.1':
-    resolution: {integrity: sha512-wGL8fCnlZvWjRZQukXvHRJrmmDVt2gYWS2/khwF68fBD48Bn3iymywmkVmYBRa10UAUkZqePLLM2GT11FO/JnQ==}
+  '@emdzej/csfs-node@0.2.0':
+    resolution: {integrity: sha512-K493yQbO6FbU+maAQQke0ctbjHVZZ32F5lrzgitFKG+RbkS4x/0OX05GOclaPcwYysmaTbokPspY2sVO7ZuOZg==}
 
-  '@emdzej/csfs-opfs@0.1.1':
-    resolution: {integrity: sha512-5ZqSpFThcxj9LilETcW0HwkeBYTxcc/qSLu9dH+GcmhjvqgPPhIUcEnqiBhRNi9sozYT2zyH0A79GMBK+bX4bA==}
+  '@emdzej/csfs-opfs@0.2.0':
+    resolution: {integrity: sha512-Nk5D9ZWQK9NHAKHqGRfxZVniQb8CpnQ8hmTyg4MwZK2retOQLo1EW8xHoML6rSAy5QSd6cfmu4JXprmCnJ9j2Q==}
 
   '@esbuild/aix-ppc64@0.21.5':
     resolution: {integrity: sha512-1SDgH6ZSPTlggy1yI6+Dbkiz8xzpHJEVAlF/AM1tHPLsf5STom9rwtjE4hKAF20FfXXNTFqEYXyJNWh1GiZedQ==}
@@ -3164,29 +3164,29 @@ snapshots:
     dependencies:
       commander: 15.0.0
 
-  '@emdzej/csfs-core@0.1.1': {}
+  '@emdzej/csfs-core@0.2.0': {}
 
-  '@emdzej/csfs-fsa@0.1.1':
+  '@emdzej/csfs-fsa@0.2.0':
     dependencies:
-      '@emdzej/csfs-core': 0.1.1
+      '@emdzej/csfs-core': 0.2.0
 
-  '@emdzej/csfs-http@0.1.1':
+  '@emdzej/csfs-http@0.2.0':
     dependencies:
-      '@emdzej/csfs-core': 0.1.1
-      '@emdzej/csfs-manifest': 0.1.1
+      '@emdzej/csfs-core': 0.2.0
+      '@emdzej/csfs-manifest': 0.2.0
 
-  '@emdzej/csfs-manifest@0.1.1':
+  '@emdzej/csfs-manifest@0.2.0':
     dependencies:
-      '@emdzej/csfs-core': 0.1.1
+      '@emdzej/csfs-core': 0.2.0
 
-  '@emdzej/csfs-node@0.1.1':
+  '@emdzej/csfs-node@0.2.0':
     dependencies:
-      '@emdzej/csfs-core': 0.1.1
+      '@emdzej/csfs-core': 0.2.0
 
-  '@emdzej/csfs-opfs@0.1.1':
+  '@emdzej/csfs-opfs@0.2.0':
     dependencies:
-      '@emdzej/csfs-core': 0.1.1
-      '@emdzej/csfs-fsa': 0.1.1
+      '@emdzej/csfs-core': 0.2.0
+      '@emdzej/csfs-fsa': 0.2.0
 
   '@esbuild/aix-ppc64@0.21.5':
     optional: true

@@ -1,6 +1,6 @@
 {
   "name": "@masax/importer",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "description": "Recognise mounted ASA discs, read several as one tree, and copy them into one",
   "license": "PolyForm-Noncommercial-1.0.0",
@@ -19,6 +19,6 @@
     "clean": "rm -rf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
-    "@emdzej/csfs-core": "^0.1.1"
+    "@emdzej/csfs-core": "^0.2.0"
   }
 }

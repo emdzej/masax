@@ -94,7 +94,27 @@ export async function checkDiscs(discs: Disc[]): Promise<string[]> {
 
 /** A hosted tree. The manifest is how it lists directories at all. */
 export async function openHttp(base: string): Promise<Opened> {
-  const fs = httpFileSystem(base);
+  const fs = httpFileSystem(base, {
+    /*
+     * Case-insensitive, as the picked-folder and OPFS backends already are.
+     * The two discs disagree about `Illust` versus `ILLUST`, so a hosted tree
+     * made from one of them answers for the other's spelling — and here it is
+     * free, being one map over a manifest that is already in memory.
+     */
+    caseInsensitive: true,
+    /*
+     * A host that ignores `Range` is refused rather than read whole.
+     *
+     * csfs 0.2.0 defaults to `"auto"`, which slices a whole body locally and is
+     * the right default for most data. It is the wrong one for this: a record
+     * read is about two hundred bytes, `VIN.BIN` is 76 MB, and it is larger
+     * than the 16 MiB whole-body cache — so decoding one VIN would transfer
+     * 76 MB and the next would transfer it again. Failing with
+     * `RangeUnsupportedError` points at the host, which is the thing that can
+     * actually be fixed.
+     */
+    ranges: "require",
+  });
   const found = await survey(fs);
   const module = found.modules.find((m) => m.has.epc);
   if (!module) throw new Error(`${base}: no ASA catalogue found`);
