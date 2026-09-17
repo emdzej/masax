@@ -8,7 +8,12 @@ as much as its evidence — the reasoning behind each one is in
 Versions follow [semantic versioning](https://semver.org/). Before 1.0 a minor
 bump is where features land.
 
-## 0.4.1
+## 0.5.0
+
+A minor rather than a patch: how a hosted tree is read changed, and that is
+observable to anyone hosting one. Names now resolve without regard to case, and
+a host that does not answer `Range` requests is refused rather than worked
+around.
 
 ### Changed
 
